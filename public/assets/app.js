@@ -241,8 +241,8 @@ if (photoAddForm) {
 
     const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
     const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
-    const VIDEO_CHUNK_BYTES = 192 * 1024;
-    const PHOTO_CHUNK_BYTES = 96 * 1024;
+    const VIDEO_CHUNK_BYTES = isLikelyMobileUpload ? 320 * 1024 : 512 * 1024;
+    const PHOTO_CHUNK_BYTES = isLikelyMobileUpload ? 160 * 1024 : 256 * 1024;
     const isLikelyMobileUpload =
         window.matchMedia('(max-width: 780px)').matches
         || window.matchMedia('(pointer: coarse)').matches;
@@ -351,7 +351,6 @@ if (photoAddForm) {
 
         videoUploadInProgress = true;
         setSubmitLoadingState(true, 'Загрузка видео...');
-        setVideoFrameMessage('Подготавливаем видео к загрузке...');
 
         try {
             for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
@@ -399,16 +398,13 @@ if (photoAddForm) {
                     }
 
                     if (attempt < 3) {
-                        await new Promise((resolve) => window.setTimeout(resolve, 400 * attempt));
+                        await new Promise((resolve) => window.setTimeout(resolve, 220 * attempt));
                     }
                 }
 
                 if (!response || !response.ok || !payload || payload.ok !== true) {
                     throw lastError || new Error('Не удалось загрузить видео (ошибка чанка).');
                 }
-
-                const percent = Math.round(((chunkIndex + 1) / totalChunks) * 100);
-                setVideoFrameMessage(`Загрузка видео: ${percent}%`);
 
                 if (payload.completed === true && payload.file_name) {
                     videoStagedFileNameInput.value = String(payload.file_name);
@@ -497,7 +493,7 @@ if (photoAddForm) {
                     }
 
                     if (attempt < 3) {
-                        await new Promise((resolve) => window.setTimeout(resolve, 350 * attempt));
+                        await new Promise((resolve) => window.setTimeout(resolve, 200 * attempt));
                     }
                 }
 
@@ -986,7 +982,6 @@ if (photoAddForm) {
         if (!hasStagedVideo) {
             event.preventDefault();
             if (videoInput && videoInput.files && videoInput.files[0]) {
-                setVideoFrameMessage('Загружаем видео на сервер...');
                 const uploaded = await uploadVideoInChunks(videoInput.files[0]);
                 if (uploaded) {
                     if (!photoAddForm.dataset.videoAutoretry) {

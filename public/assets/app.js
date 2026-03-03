@@ -797,7 +797,11 @@ if (photoAddForm) {
                 return;
             }
 
-            await uploadVideoInChunks(videoInput.files[0]);
+            if (videoStagedFileNameInput) {
+                videoStagedFileNameInput.value = '';
+            }
+
+            setVideoFrameMessage('Видео выбрано. Нажмите «Загрузить», чтобы отправить его частями.');
         });
     }
 

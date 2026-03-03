@@ -11,16 +11,14 @@ function gallery_lower(string $value): string
 
 function gallery_list(PDO $pdo, int $userId): array
 {
-    $stmt = $pdo->prepare('SELECT id, title, description, file_name, media_type, preview_file_name, photo_date, tags, card_focus_x, card_focus_y, created_at FROM photos WHERE user_id = :user_id ORDER BY id DESC');
-    $stmt->execute([':user_id' => $userId]);
+    $stmt = $pdo->query('SELECT id, title, description, file_name, media_type, preview_file_name, photo_date, tags, card_focus_x, card_focus_y, created_at FROM photos ORDER BY id DESC');
     return $stmt->fetchAll() ?: [];
 }
 
 function gallery_get(PDO $pdo, int $userId, int $photoId): ?array
 {
-    $stmt = $pdo->prepare('SELECT id, title, description, file_name, media_type, preview_file_name, photo_date, tags, card_focus_x, card_focus_y, created_at FROM photos WHERE user_id = :user_id AND id = :id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT id, title, description, file_name, media_type, preview_file_name, photo_date, tags, card_focus_x, card_focus_y, created_at FROM photos WHERE id = :id LIMIT 1');
     $stmt->execute([
-        ':user_id' => $userId,
         ':id' => $photoId,
     ]);
 
@@ -31,8 +29,8 @@ function gallery_get(PDO $pdo, int $userId, int $photoId): ?array
 
 function gallery_search(PDO $pdo, int $userId, string $titleQuery, string $tagQuery, ?string $dateFrom, ?string $dateTo): array
 {
-    $sql = 'SELECT id, title, description, file_name, media_type, preview_file_name, photo_date, tags, card_focus_x, card_focus_y, created_at FROM photos WHERE user_id = :user_id';
-    $params = [':user_id' => $userId];
+    $sql = 'SELECT id, title, description, file_name, media_type, preview_file_name, photo_date, tags, card_focus_x, card_focus_y, created_at FROM photos WHERE 1=1';
+    $params = [];
 
     $titleQuery = trim($titleQuery);
     if ($titleQuery !== '') {

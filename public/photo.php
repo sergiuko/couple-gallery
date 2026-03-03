@@ -80,7 +80,7 @@ $isValidName = $fileName !== ''
     && basename($fileName) === $fileName
     && preg_match('/^[A-Za-z0-9._-]+$/', $fileName) === 1;
 
-if (!$isValidName || !is_file($uploadDir . '/' . $fileName)) {
+if (!$isValidName || !media_file_exists($config, $fileName)) {
     flash_set('error', 'Файл этого фото недоступен.');
     redirect('/index.php');
 }
@@ -93,7 +93,7 @@ if ($mediaType === 'video') {
         $previewFileName !== ''
         && basename($previewFileName) === $previewFileName
         && preg_match('/^[A-Za-z0-9._-]+$/', $previewFileName) === 1
-        && is_file($uploadDir . '/' . $previewFileName)
+        && media_file_exists($config, $previewFileName)
     ) {
         $videoPosterUrl = media_public_file_url($config, $previewFileName);
     }

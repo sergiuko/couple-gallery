@@ -157,7 +157,7 @@ foreach ($photos as $photoRow) {
         $fileName === ''
         || basename($fileName) !== $fileName
         || preg_match('/^[A-Za-z0-9._-]+$/', $fileName) !== 1
-        || !is_file($uploadDir . '/' . $fileName)
+        || !media_file_exists($config, $fileName)
     ) {
         continue;
     }
@@ -169,7 +169,7 @@ foreach ($photos as $photoRow) {
             $previewFileName === ''
             || basename($previewFileName) !== $previewFileName
             || preg_match('/^[A-Za-z0-9._-]+$/', $previewFileName) !== 1
-            || !is_file($uploadDir . '/' . $previewFileName)
+            || !media_file_exists($config, $previewFileName)
         ) {
             continue;
         }

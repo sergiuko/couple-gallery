@@ -77,3 +77,22 @@ function media_public_file_url(array $config, string $fileName): string
 {
     return media_public_url_prefix($config) . '/' . rawurlencode($fileName);
 }
+
+function media_skip_local_file_check(array $config): bool
+{
+    return (bool) ($config['media']['skip_local_file_check'] ?? false);
+}
+
+function media_file_path(array $config, string $fileName): string
+{
+    return media_storage_dir($config) . '/' . $fileName;
+}
+
+function media_file_exists(array $config, string $fileName): bool
+{
+    if (media_skip_local_file_check($config)) {
+        return true;
+    }
+
+    return is_file(media_file_path($config, $fileName));
+}

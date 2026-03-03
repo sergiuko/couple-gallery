@@ -3,10 +3,15 @@
 $defaultSqlitePath = __DIR__ . '/../storage/gallery.sqlite';
 $isAzureAppService = (bool) getenv('WEBSITE_INSTANCE_ID');
 $defaultMediaPublicPrefix = '/uploads';
+$defaultSkipLocalMediaCheck = false;
 
 if ($isAzureAppService && PHP_OS_FAMILY !== 'Windows') {
     $defaultSqlitePath = '/home/data/couple-gallery/gallery.sqlite';
     $defaultMediaPublicPrefix = '/public/uploads';
+}
+
+if (str_starts_with(strtolower($defaultMediaPublicPrefix), 'http://') || str_starts_with(strtolower($defaultMediaPublicPrefix), 'https://')) {
+    $defaultSkipLocalMediaCheck = true;
 }
 
 $config = [
@@ -27,6 +32,12 @@ $config = [
     'media' => [
         'storage_dir' => getenv('MEDIA_STORAGE_DIR') ?: (__DIR__ . '/../public/uploads'),
         'public_url_prefix' => getenv('MEDIA_PUBLIC_URL_PREFIX') ?: $defaultMediaPublicPrefix,
+        'skip_local_file_check' => filter_var(
+            getenv('MEDIA_SKIP_LOCAL_FILE_CHECK') !== false
+                ? getenv('MEDIA_SKIP_LOCAL_FILE_CHECK')
+                : ($defaultSkipLocalMediaCheck ? '1' : '0'),
+            FILTER_VALIDATE_BOOL
+        ),
     ],
 ];
 

@@ -184,12 +184,12 @@ $focusY = max(0, min(100, (int) ($photo['card_focus_y'] ?? 50)));
         <a class="back-link" href="/index.php">← Назад на главную</a>
         <div class="photo-view-media">
             <?php if ($mediaType === 'video'): ?>
-                <video controls preload="metadata" playsinline<?= $videoPosterUrl ? ' poster="' . esc($videoPosterUrl) . '"' : '' ?> style="object-position: <?= $focusX ?>% <?= $focusY ?>%;">
+                <video controls preload="auto" playsinline data-preload-full="1"<?= $videoPosterUrl ? ' poster="' . esc($videoPosterUrl) . '"' : '' ?>>
                     <source src="<?= esc($imageUrl) ?>">
                     Ваш браузер не поддерживает воспроизведение видео.
                 </video>
             <?php else: ?>
-                <img src="<?= esc($imageUrl) ?>" alt="<?= esc($photo['title']) ?>" style="object-position: <?= $focusX ?>% <?= $focusY ?>%;">
+                <img src="<?= esc($imageUrl) ?>" alt="<?= esc($photo['title']) ?>">
             <?php endif; ?>
         </div>
         <div class="photo-view-content">

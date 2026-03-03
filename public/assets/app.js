@@ -130,6 +130,41 @@ document.addEventListener('keydown', (event) => {
         return;
     }
 
+
+const detailVideo = document.querySelector('.photo-view-media video[data-preload-full="1"]');
+if (detailVideo) {
+    const sourceNode = detailVideo.querySelector('source');
+    const sourceUrl = detailVideo.currentSrc || sourceNode?.src;
+
+    if (sourceUrl) {
+        fetch(sourceUrl, { credentials: 'same-origin' })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('Не удалось предварительно загрузить видео.');
+                }
+
+                return response.blob();
+            })
+            .then((blob) => {
+                const objectUrl = URL.createObjectURL(blob);
+                const currentTime = Number(detailVideo.currentTime || 0);
+
+                detailVideo.src = objectUrl;
+                detailVideo.load();
+
+                if (Number.isFinite(currentTime) && currentTime > 0) {
+                    try {
+                        detailVideo.currentTime = currentTime;
+                    } catch (_error) {
+                        // ignore seek restore errors
+                    }
+                }
+            })
+            .catch(() => {
+                // keep native streaming playback if prefetch fails
+            });
+    }
+}
     setMobileProfileState(false);
     setMobileMenuState(false);
 });
@@ -200,10 +235,8 @@ if (photoAddForm) {
     const mediaTypeInputs = photoAddForm.querySelectorAll('input[name="media_type"]');
     const sourceInputs = photoAddForm.querySelectorAll('input[name="source_type"]');
     let selectedVideoObjectUrl = null;
-    let photoCompressionPromise = Promise.resolve();
     let videoUploadInProgress = false;
 
-    const MAX_SAFE_PHOTO_BYTES = 2.8 * 1024 * 1024;
     const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
     const VIDEO_CHUNK_BYTES = 512 * 1024;
     const submitButton = photoAddForm.querySelector('button[type="submit"]');
@@ -509,88 +542,6 @@ if (photoAddForm) {
         previewImage.src = URL.createObjectURL(file);
     };
 
-    const replacePhotoInputFile = (newFile) => {
-        if (!fileInput || !newFile) {
-            return;
-        }
-
-        if (typeof DataTransfer !== 'function') {
-            return;
-        }
-
-        const transfer = new DataTransfer();
-        transfer.items.add(newFile);
-        fileInput.files = transfer.files;
-    };
-
-    const compressPhotoFileIfNeeded = async () => {
-        if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-            return;
-        }
-
-        const originalFile = fileInput.files[0];
-        if (!originalFile.type.startsWith('image/')) {
-            return;
-        }
-
-        if (originalFile.size <= MAX_SAFE_PHOTO_BYTES) {
-            return;
-        }
-
-        const imageUrl = URL.createObjectURL(originalFile);
-
-        try {
-            const image = await new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = () => reject(new Error('Не удалось прочитать изображение.'));
-                img.src = imageUrl;
-            });
-
-            const maxSide = 1920;
-            const ratio = Math.min(1, maxSide / Math.max(image.width, image.height));
-            const width = Math.max(1, Math.round(image.width * ratio));
-            const height = Math.max(1, Math.round(image.height * ratio));
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-
-            const context = canvas.getContext('2d');
-            if (!context) {
-                return;
-            }
-
-            context.drawImage(image, 0, 0, width, height);
-
-            const compressedBlob = await new Promise((resolve) => {
-                canvas.toBlob((blob) => resolve(blob || null), 'image/jpeg', 0.78);
-            });
-
-            if (!compressedBlob) {
-                return;
-            }
-
-            if (compressedBlob.size > MAX_SAFE_PHOTO_BYTES) {
-                setVideoFrameMessage('Фото слишком большое для сервера. Выберите файл меньшего размера.');
-                return;
-            }
-
-            const compressedFile = new File(
-                [compressedBlob],
-                originalFile.name.replace(/\.[^.]+$/, '') + '.jpg',
-                { type: 'image/jpeg', lastModified: Date.now() }
-            );
-
-            replacePhotoInputFile(compressedFile);
-            if (previewImage) {
-                previewImage.src = URL.createObjectURL(compressedFile);
-            }
-        } finally {
-            URL.revokeObjectURL(imageUrl);
-        }
-    };
-
     const loadPreviewFromUrl = () => {
         if (!urlInput || !previewImage) {
             return;
@@ -611,10 +562,7 @@ if (photoAddForm) {
     }
 
     if (fileInput) {
-        fileInput.addEventListener('change', () => {
-            loadPreviewFromImageFile();
-            photoCompressionPromise = compressPhotoFileIfNeeded();
-        });
+        fileInput.addEventListener('change', loadPreviewFromImageFile);
     }
 
     if (videoInput) {
@@ -708,12 +656,6 @@ if (photoAddForm) {
 
     photoAddForm.addEventListener('submit', async (event) => {
         if (selectedMediaType() === 'photo') {
-            if (selectedSourceType() === 'upload' && fileInput && fileInput.files && fileInput.files[0] && fileInput.files[0].size > MAX_SAFE_PHOTO_BYTES) {
-                event.preventDefault();
-                window.alert('Фото слишком большое для текущего сервера. Выберите файл до 2.8MB.');
-                return;
-            }
-
             setSubmitLoadingState(true, 'Загрузка...');
 
             return;
@@ -743,16 +685,6 @@ if (photoAddForm) {
                 }
             } else {
                 setVideoFrameMessage('Сначала выберите видеофайл и дождитесь его загрузки.');
-            }
-            return;
-        }
-
-        const hasFrame = videoPreviewFrameInput && videoPreviewFrameInput.value.trim() !== '';
-        if (!hasFrame) {
-            event.preventDefault();
-            setVideoFrameMessage('Сначала выберите кадр из видео для превью карточки.');
-            if (videoFramePicker) {
-                videoFramePicker.hidden = false;
             }
             return;
         }

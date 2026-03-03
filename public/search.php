@@ -7,7 +7,7 @@ if (!$user) {
     redirect('/login.php');
 }
 
-$uploadDir = __DIR__ . '/uploads';
+$uploadDir = media_storage_dir($config);
 $titleQuery = trim((string) ($_GET['q'] ?? ''));
 $titleQuery = preg_replace('/\?q=.*/u', '', $titleQuery) ?? $titleQuery;
 $tagQuery = trim((string) ($_GET['tag'] ?? ''));
@@ -181,7 +181,7 @@ foreach ($photos as $photoRow) {
         'id' => (int) ($photoRow['id'] ?? 0),
         'title' => (string) ($photoRow['title'] ?? ''),
         'description' => (string) ($photoRow['description'] ?? ''),
-        'imageUrl' => 'uploads/' . rawurlencode($cardFileName),
+        'imageUrl' => media_public_file_url($config, $cardFileName),
         'mediaType' => $mediaType,
         'displayDate' => $displayDate($photoRow),
         'tags' => $getTags($photoRow),

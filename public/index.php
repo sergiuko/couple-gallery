@@ -7,7 +7,7 @@ if (!$user) {
     redirect('/login.php');
 }
 
-$uploadDir = __DIR__ . '/uploads';
+$uploadDir = media_storage_dir($config);
 $photos = gallery_list($pdo, (int) $user['id']);
 $visiblePhotos = [];
 $visibleVideos = [];
@@ -202,7 +202,7 @@ function photo_display_date(array $photo): string
             <div class="slider-wrap">
                 <div class="slider-track slider-track-left" data-slider-track>
                     <?php foreach ($photoTopSlider as $photo): ?>
-                        <?php $imageUrl = 'uploads/' . rawurlencode((string) $photo['file_name']); ?>
+                        <?php $imageUrl = media_public_file_url($config, (string) $photo['file_name']); ?>
                         <?php $photoDate = photo_display_date($photo); ?>
                         <?php $focusX = max(0, min(100, (int) ($photo['card_focus_x'] ?? 50))); ?>
                         <?php $focusY = max(0, min(100, (int) ($photo['card_focus_y'] ?? 50))); ?>
@@ -218,7 +218,7 @@ function photo_display_date(array $photo): string
 
                 <div class="slider-track slider-track-right" data-slider-track>
                     <?php foreach ($photoBottomSlider as $photo): ?>
-                        <?php $imageUrl = 'uploads/' . rawurlencode((string) $photo['file_name']); ?>
+                        <?php $imageUrl = media_public_file_url($config, (string) $photo['file_name']); ?>
                         <?php $photoDate = photo_display_date($photo); ?>
                         <?php $focusX = max(0, min(100, (int) ($photo['card_focus_x'] ?? 50))); ?>
                         <?php $focusY = max(0, min(100, (int) ($photo['card_focus_y'] ?? 50))); ?>
@@ -247,7 +247,7 @@ function photo_display_date(array $photo): string
             <div class="slider-wrap">
                 <div class="slider-track slider-track-left" data-slider-track>
                     <?php foreach ($videoTopSlider as $video): ?>
-                        <?php $previewUrl = 'uploads/' . rawurlencode((string) $video['preview_file_name']); ?>
+                        <?php $previewUrl = media_public_file_url($config, (string) $video['preview_file_name']); ?>
                         <?php $videoDate = photo_display_date($video); ?>
                         <?php $focusX = max(0, min(100, (int) ($video['card_focus_x'] ?? 50))); ?>
                         <?php $focusY = max(0, min(100, (int) ($video['card_focus_y'] ?? 50))); ?>
@@ -263,7 +263,7 @@ function photo_display_date(array $photo): string
 
                 <div class="slider-track slider-track-right" data-slider-track>
                     <?php foreach ($videoBottomSlider as $video): ?>
-                        <?php $previewUrl = 'uploads/' . rawurlencode((string) $video['preview_file_name']); ?>
+                        <?php $previewUrl = media_public_file_url($config, (string) $video['preview_file_name']); ?>
                         <?php $videoDate = photo_display_date($video); ?>
                         <?php $focusX = max(0, min(100, (int) ($video['card_focus_x'] ?? 50))); ?>
                         <?php $focusY = max(0, min(100, (int) ($video['card_focus_y'] ?? 50))); ?>

@@ -22,6 +22,10 @@ $config = [
         'pass' => getenv('DB_PASS') ?: '',
         'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
     ],
+    'media' => [
+        'storage_dir' => getenv('MEDIA_STORAGE_DIR') ?: (__DIR__ . '/../public/uploads'),
+        'public_url_prefix' => getenv('MEDIA_PUBLIC_URL_PREFIX') ?: '/uploads',
+    ],
 ];
 
 $localConfigPath = __DIR__ . '/config.local.php';

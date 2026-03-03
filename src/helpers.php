@@ -50,3 +50,30 @@ function flash_get(string $type): ?string
 
     return $message;
 }
+
+function media_storage_dir(array $config): string
+{
+    $configured = trim((string) ($config['media']['storage_dir'] ?? ''));
+    if ($configured === '') {
+        $configured = __DIR__ . '/../public/uploads';
+    }
+
+    return rtrim($configured, '/\\');
+}
+
+function media_public_url_prefix(array $config): string
+{
+    $prefix = trim((string) ($config['media']['public_url_prefix'] ?? '/uploads'));
+    if ($prefix === '') {
+        $prefix = '/uploads';
+    }
+
+    $prefix = '/' . ltrim($prefix, '/');
+
+    return rtrim($prefix, '/');
+}
+
+function media_public_file_url(array $config, string $fileName): string
+{
+    return media_public_url_prefix($config) . '/' . rawurlencode($fileName);
+}

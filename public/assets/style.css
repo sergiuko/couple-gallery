@@ -34,8 +34,6 @@ html.reduced-effects {
 }
 
 html.reduced-effects .animated-bg-grid,
-html.reduced-effects .cute-bg,
-html.reduced-effects .bg-glow,
 html.reduced-effects .slider-track-left,
 html.reduced-effects .slider-track-right,
 html.reduced-effects .animate-fade-up,
@@ -45,6 +43,25 @@ html.reduced-effects .mobile-profile-panel::before,
 html.reduced-effects .profile-dropdown::before {
     animation: none !important;
     transition: none !important;
+}
+
+html.reduced-effects .animated-bg-grid {
+    animation: gridShift 56s linear infinite !important;
+    opacity: 0.08;
+}
+
+html.reduced-effects .bg-glow {
+    animation: float 26s ease-in-out infinite !important;
+    opacity: 0.24;
+    filter: blur(52px);
+}
+
+html.reduced-effects .cute-bg {
+    opacity: 0.14;
+}
+
+html.reduced-effects .cute-float {
+    animation-duration: 20s !important;
 }
 
 html.reduced-effects .mobile-menu,
@@ -1615,15 +1632,30 @@ button:active {
 }
 
 @media (max-width: 780px) {
-    .animated-bg-grid,
+    .animated-bg-grid {
+        display: block;
+        opacity: 0.08;
+        animation: gridShift 54s linear infinite;
+    }
+
     .cute-bg {
+        display: block;
+        opacity: 0.14;
+    }
+
+    .cute-float:nth-child(n + 5) {
         display: none;
     }
 
+    .cute-float {
+        font-size: 16px;
+        animation-duration: 18s;
+    }
+
     .bg-glow {
-        filter: blur(40px);
-        opacity: 0.3;
-        animation: none;
+        filter: blur(46px);
+        opacity: 0.24;
+        animation: float 24s ease-in-out infinite;
     }
 
     .slider-track-left,

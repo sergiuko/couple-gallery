@@ -14,4 +14,8 @@ return [
         'pass' => 'YOUR_DB_PASSWORD',
         'charset' => 'utf8mb4',
     ],
+    'media' => [
+        'storage_dir' => __DIR__ . '/../public/uploads',
+        'public_url_prefix' => '/uploads',
+    ],
 ];

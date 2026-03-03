@@ -7,7 +7,7 @@ if (!$user) {
     redirect('/login.php');
 }
 
-$uploadDir = __DIR__ . '/uploads';
+$uploadDir = media_storage_dir($config);
 $photoId = (int) ($_GET['id'] ?? 0);
 
 if ($photoId <= 0) {
@@ -85,7 +85,7 @@ if (!$isValidName || !is_file($uploadDir . '/' . $fileName)) {
     redirect('/index.php');
 }
 
-$imageUrl = 'uploads/' . rawurlencode($fileName);
+$imageUrl = media_public_file_url($config, $fileName);
 $videoPosterUrl = null;
 if ($mediaType === 'video') {
     $previewFileName = (string) ($photo['preview_file_name'] ?? '');
@@ -95,7 +95,7 @@ if ($mediaType === 'video') {
         && preg_match('/^[A-Za-z0-9._-]+$/', $previewFileName) === 1
         && is_file($uploadDir . '/' . $previewFileName)
     ) {
-        $videoPosterUrl = 'uploads/' . rawurlencode($previewFileName);
+        $videoPosterUrl = media_public_file_url($config, $previewFileName);
     }
 }
 $photoDate = trim((string) ($photo['photo_date'] ?? ''));

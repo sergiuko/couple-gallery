@@ -7,11 +7,11 @@ if (!$user) {
     redirect('/login.php');
 }
 
-$uploadDir = __DIR__ . '/uploads';
+$uploadDir = media_storage_dir($config);
 if (!is_dir($uploadDir)) {
     $created = mkdir($uploadDir, 0755, true);
     if (!$created && !is_dir($uploadDir)) {
-        flash_set('error', 'Не удалось создать папку uploads на сервере.');
+        flash_set('error', 'Не удалось создать папку для медиа на сервере.');
         redirect('/add.php');
     }
 }
@@ -348,7 +348,7 @@ if (is_post()) {
     }
 
     if (!is_writable($uploadDir)) {
-        flash_set('error', 'Папка uploads недоступна для записи. Проверьте права доступа.');
+        flash_set('error', 'Папка для медиа недоступна для записи. Проверьте права доступа сервера.');
         redirect('/add.php');
     }
 

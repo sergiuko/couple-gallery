@@ -51,35 +51,35 @@ $success = flash_get('success');
 
 function build_slider_tracks(array $items): array
 {
-    $topSlider = $items;
-    $bottomSlider = $items;
+    if ($items === []) {
+        return [[], []];
+    }
 
-    if (count($topSlider) > 1) {
-        shuffle($topSlider);
-        $attempt = 0;
+    $shuffled = $items;
+    shuffle($shuffled);
 
-        do {
-            $bottomSlider = $items;
-            shuffle($bottomSlider);
-            $attempt++;
-        } while ($bottomSlider === $topSlider && $attempt < 5);
+    $topSlider = [];
+    $bottomSlider = [];
 
-        $offset = random_int(1, count($bottomSlider) - 1);
-        for ($index = 0; $index < $offset; $index++) {
-            $moved = array_shift($bottomSlider);
-            if ($moved !== null) {
-                $bottomSlider[] = $moved;
-            }
+    foreach ($shuffled as $index => $item) {
+        if ($index % 2 === 0) {
+            $topSlider[] = $item;
+            continue;
         }
+
+        $bottomSlider[] = $item;
     }
 
-    if ($topSlider !== []) {
-        $topSlider = array_merge($topSlider, $topSlider);
+    if ($topSlider === []) {
+        $topSlider = $shuffled;
     }
 
-    if ($bottomSlider !== []) {
-        $bottomSlider = array_merge($bottomSlider, $bottomSlider);
+    if ($bottomSlider === []) {
+        $bottomSlider = $topSlider;
     }
+
+    $topSlider = array_merge($topSlider, $topSlider);
+    $bottomSlider = array_merge($bottomSlider, $bottomSlider);
 
     return [$topSlider, $bottomSlider];
 }
@@ -280,6 +280,13 @@ function photo_display_date(array $photo): string
         <?php endif; ?>
     </section>
 </main>
+
+<footer class="love-footer animate-fade-up delay-3" aria-label="Love is footer">
+    <div class="love-is-line" aria-hidden="true">
+        <span class="love-is-beam"></span>
+        <span class="love-is-text"><span class="love-is-heart">❤</span><span>Love is...</span></span>
+    </div>
+</footer>
 
 <script src="/assets/app.js?v=<?= urlencode((string) filemtime(__DIR__ . '/assets/app.js')) ?>"></script>
 </body>

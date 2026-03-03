@@ -1,5 +1,12 @@
 <?php
 
+$defaultSqlitePath = __DIR__ . '/../storage/gallery.sqlite';
+$isAzureAppService = (bool) getenv('WEBSITE_INSTANCE_ID');
+
+if ($isAzureAppService && PHP_OS_FAMILY !== 'Windows') {
+    $defaultSqlitePath = '/home/data/couple-gallery/gallery.sqlite';
+}
+
 $config = [
     'app' => [
         'session_name' => getenv('APP_SESSION_NAME') ?: 'couple_gallery_session',
@@ -7,7 +14,7 @@ $config = [
     ],
     'db' => [
         'driver' => getenv('DB_DRIVER') ?: 'sqlite',
-        'sqlite_path' => __DIR__ . '/../storage/gallery.sqlite',
+        'sqlite_path' => getenv('SQLITE_PATH') ?: $defaultSqlitePath,
         'host' => getenv('DB_HOST') ?: '127.0.0.1',
         'port' => (int) (getenv('DB_PORT') ?: 3306),
         'name' => getenv('DB_NAME') ?: '',

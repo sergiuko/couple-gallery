@@ -205,9 +205,10 @@ if (photoAddForm) {
 
     const MAX_SAFE_PHOTO_BYTES = 2.8 * 1024 * 1024;
     const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
-    const VIDEO_CHUNK_BYTES = 2 * 1024 * 1024;
+    const VIDEO_CHUNK_BYTES = 512 * 1024;
     const submitButton = photoAddForm.querySelector('button[type="submit"]');
     const csrfTokenInput = photoAddForm.querySelector('input[name="csrf_token"]');
+    const submitButtonDefaultText = submitButton ? submitButton.textContent : '';
 
     const formatSeconds = (value) => Number(value || 0).toFixed(1);
 
@@ -221,6 +222,23 @@ if (photoAddForm) {
         if (submitButton) {
             submitButton.disabled = !enabled;
         }
+    };
+
+    const setSubmitLoadingState = (loading, text = 'Загрузка...') => {
+        if (!submitButton) {
+            return;
+        }
+
+        if (loading) {
+            submitButton.disabled = true;
+            submitButton.textContent = text;
+            submitButton.classList.add('is-loading');
+            return;
+        }
+
+        submitButton.disabled = false;
+        submitButton.textContent = submitButtonDefaultText || 'Загрузить';
+        submitButton.classList.remove('is-loading');
     };
 
     const clearVideoFrameData = () => {
@@ -289,7 +307,7 @@ if (photoAddForm) {
         const totalChunks = Math.max(1, Math.ceil(file.size / VIDEO_CHUNK_BYTES));
 
         videoUploadInProgress = true;
-        setSubmitEnabled(false);
+        setSubmitLoadingState(true, 'Загрузка видео...');
         setVideoFrameMessage('Подготавливаем видео к загрузке...');
 
         try {
@@ -307,24 +325,43 @@ if (photoAddForm) {
                 formData.append('file_size', String(file.size));
                 formData.append('chunk', chunkBlob, `chunk_${chunkIndex}.part`);
 
-                const response = await fetch('/upload_video_chunk.php', {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin',
-                });
-
+                let response = null;
                 let payload = null;
-                try {
-                    payload = await response.json();
-                } catch (_error) {
-                    payload = null;
+                let lastError = null;
+
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    try {
+                        response = await fetch('/upload_video_chunk.php', {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'same-origin',
+                        });
+
+                        try {
+                            payload = await response.json();
+                        } catch (_error) {
+                            payload = null;
+                        }
+
+                        if (response.ok && payload && payload.ok === true) {
+                            break;
+                        }
+
+                        const errorMessage = payload && payload.error
+                            ? String(payload.error)
+                            : 'Не удалось загрузить видео (ошибка чанка).';
+                        lastError = new Error(errorMessage);
+                    } catch (error) {
+                        lastError = error instanceof Error ? error : new Error('Ошибка сети при загрузке чанка.');
+                    }
+
+                    if (attempt < 3) {
+                        await new Promise((resolve) => window.setTimeout(resolve, 400 * attempt));
+                    }
                 }
 
-                if (!response.ok || !payload || payload.ok !== true) {
-                    const errorMessage = payload && payload.error
-                        ? String(payload.error)
-                        : 'Не удалось загрузить видео (ошибка чанка).';
-                    throw new Error(errorMessage);
+                if (!response || !response.ok || !payload || payload.ok !== true) {
+                    throw lastError || new Error('Не удалось загрузить видео (ошибка чанка).');
                 }
 
                 const percent = Math.round(((chunkIndex + 1) / totalChunks) * 100);
@@ -347,6 +384,7 @@ if (photoAddForm) {
             return false;
         } finally {
             videoUploadInProgress = false;
+            setSubmitLoadingState(false);
             setSubmitEnabled(true);
         }
     };
@@ -651,12 +689,15 @@ if (photoAddForm) {
         });
     }
 
-    photoAddForm.addEventListener('submit', (event) => {
+    photoAddForm.addEventListener('submit', async (event) => {
         if (selectedMediaType() === 'photo') {
             if (selectedSourceType() === 'upload' && fileInput && fileInput.files && fileInput.files[0] && fileInput.files[0].size > MAX_SAFE_PHOTO_BYTES) {
                 event.preventDefault();
                 window.alert('Фото слишком большое для текущего сервера. Выберите файл до 2.8MB.');
+                return;
             }
+
+            setSubmitLoadingState(true, 'Загрузка...');
 
             return;
         }
@@ -668,9 +709,24 @@ if (photoAddForm) {
         }
 
         const hasStagedVideo = videoStagedFileNameInput && videoStagedFileNameInput.value.trim() !== '';
+        if (hasStagedVideo && photoAddForm.dataset.videoAutoretry) {
+            delete photoAddForm.dataset.videoAutoretry;
+        }
+
         if (!hasStagedVideo) {
             event.preventDefault();
-            setVideoFrameMessage('Сначала выберите видеофайл и дождитесь его загрузки.');
+            if (videoInput && videoInput.files && videoInput.files[0]) {
+                setVideoFrameMessage('Загружаем видео на сервер...');
+                const uploaded = await uploadVideoInChunks(videoInput.files[0]);
+                if (uploaded) {
+                    if (!photoAddForm.dataset.videoAutoretry) {
+                        photoAddForm.dataset.videoAutoretry = '1';
+                        photoAddForm.requestSubmit();
+                    }
+                }
+            } else {
+                setVideoFrameMessage('Сначала выберите видеофайл и дождитесь его загрузки.');
+            }
             return;
         }
 
@@ -688,6 +744,8 @@ if (photoAddForm) {
             videoInput.required = false;
             videoInput.disabled = true;
         }
+
+        setSubmitLoadingState(true, 'Загрузка...');
     });
 
     updateMediaMode();

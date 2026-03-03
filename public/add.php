@@ -261,6 +261,31 @@ function save_video_preview_from_data_url(string $dataUrl, string $uploadDir, ar
     return $previewFileName;
 }
 
+function create_default_video_preview_file(string $uploadDir): ?string
+{
+    $fallbackBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn2d5kAAAAASUVORK5CYII=';
+    $binary = base64_decode($fallbackBase64, true);
+
+    if (!is_string($binary) || $binary === '') {
+        return null;
+    }
+
+    try {
+        $previewFileName = bin2hex(random_bytes(16)) . '.png';
+    } catch (Throwable $exception) {
+        return null;
+    }
+
+    $targetPath = $uploadDir . '/' . $previewFileName;
+    $written = @file_put_contents($targetPath, $binary);
+
+    if ($written === false || !is_file($targetPath)) {
+        return null;
+    }
+
+    return $previewFileName;
+}
+
 if (is_post()) {
     $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
 
@@ -536,7 +561,11 @@ if (is_post()) {
         $previewFileName = save_video_preview_from_data_url($previewDataUrl, $uploadDir, $allowedImageMime);
 
         if (!$previewFileName) {
-            flash_set('error', 'Выберите кадр из видео для превью карточки.');
+            $previewFileName = create_default_video_preview_file($uploadDir);
+        }
+
+        if (!$previewFileName) {
+            flash_set('error', 'Не удалось создать превью для видео. Попробуйте снова.');
             redirect('/add.php');
         }
     }

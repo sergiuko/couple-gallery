@@ -909,6 +909,14 @@ button:active {
     transform: translateY(-1px) scale(0.99);
 }
 
+button:disabled,
+button.is-loading {
+    opacity: 0.72;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none;
+}
+
 .card-preview-wrap {
     border: 1px solid var(--line);
     border-radius: 14px;

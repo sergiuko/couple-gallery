@@ -2,9 +2,11 @@
 
 $defaultSqlitePath = __DIR__ . '/../storage/gallery.sqlite';
 $isAzureAppService = (bool) getenv('WEBSITE_INSTANCE_ID');
+$defaultMediaPublicPrefix = '/uploads';
 
 if ($isAzureAppService && PHP_OS_FAMILY !== 'Windows') {
     $defaultSqlitePath = '/home/data/couple-gallery/gallery.sqlite';
+    $defaultMediaPublicPrefix = '/public/uploads';
 }
 
 $config = [
@@ -24,7 +26,7 @@ $config = [
     ],
     'media' => [
         'storage_dir' => getenv('MEDIA_STORAGE_DIR') ?: (__DIR__ . '/../public/uploads'),
-        'public_url_prefix' => getenv('MEDIA_PUBLIC_URL_PREFIX') ?: '/uploads',
+        'public_url_prefix' => getenv('MEDIA_PUBLIC_URL_PREFIX') ?: $defaultMediaPublicPrefix,
     ],
 ];
 

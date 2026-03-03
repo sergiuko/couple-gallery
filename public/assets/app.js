@@ -238,7 +238,13 @@ if (photoAddForm) {
     let videoUploadInProgress = false;
 
     const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
-    const VIDEO_CHUNK_BYTES = 512 * 1024;
+    const VIDEO_CHUNK_BYTES = 192 * 1024;
+    const isLikelyMobileUpload =
+        window.matchMedia('(max-width: 780px)').matches
+        || window.matchMedia('(pointer: coarse)').matches;
+    const MAX_PHOTO_UPLOAD_BYTES = isLikelyMobileUpload
+        ? 2.5 * 1024 * 1024
+        : 3.5 * 1024 * 1024;
     const submitButton = photoAddForm.querySelector('button[type="submit"]');
     const csrfTokenInput = photoAddForm.querySelector('input[name="csrf_token"]');
     const submitButtonDefaultText = submitButton ? submitButton.textContent : '';
@@ -519,6 +525,105 @@ if (photoAddForm) {
         }
     };
 
+    const replaceInputFile = (input, file) => {
+        if (!input || !file || typeof DataTransfer !== 'function') {
+            return false;
+        }
+
+        try {
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            input.files = transfer.files;
+            return true;
+        } catch (_error) {
+            return false;
+        }
+    };
+
+    const blobToJpegFile = (blob, originalName) => {
+        const baseName = String(originalName || 'photo')
+            .replace(/\.[^.]+$/, '')
+            .replace(/[^A-Za-z0-9_-]+/g, '_') || 'photo';
+
+        return new File([blob], `${baseName}.jpg`, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+        });
+    };
+
+    const optimizePhotoForUpload = async (file, targetBytes) => {
+        if (!file || file.size <= targetBytes) {
+            return file;
+        }
+
+        if (!/^image\/(jpeg|jpg|png|webp)$/i.test(String(file.type || ''))) {
+            return file;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+
+        try {
+            const image = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Не удалось прочитать изображение.'));
+                img.src = objectUrl;
+            });
+
+            const width = Number(image.naturalWidth || image.width || 0);
+            const height = Number(image.naturalHeight || image.height || 0);
+
+            if (!width || !height) {
+                return file;
+            }
+
+            const maxEdge = isLikelyMobileUpload ? 1600 : 1920;
+            const scale = Math.min(1, maxEdge / Math.max(width, height));
+            const targetWidth = Math.max(1, Math.round(width * scale));
+            const targetHeight = Math.max(1, Math.round(height * scale));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+
+            const context = canvas.getContext('2d');
+            if (!context) {
+                return file;
+            }
+
+            context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+            const qualities = [0.82, 0.74, 0.66, 0.58, 0.5];
+            let bestBlob = null;
+
+            for (const quality of qualities) {
+                const blob = await new Promise((resolve) => {
+                    canvas.toBlob((result) => resolve(result || null), 'image/jpeg', quality);
+                });
+
+                if (!blob) {
+                    continue;
+                }
+
+                if (!bestBlob || blob.size < bestBlob.size) {
+                    bestBlob = blob;
+                }
+
+                if (blob.size <= targetBytes) {
+                    return blobToJpegFile(blob, file.name);
+                }
+            }
+
+            if (bestBlob && bestBlob.size < file.size) {
+                return blobToJpegFile(bestBlob, file.name);
+            }
+
+            return file;
+        } finally {
+            URL.revokeObjectURL(objectUrl);
+        }
+    };
+
     const loadPreviewFromImageFile = () => {
         if (!fileInput || !previewImage || !fileInput.files || !fileInput.files[0]) {
             return;
@@ -656,8 +761,55 @@ if (photoAddForm) {
 
     photoAddForm.addEventListener('submit', async (event) => {
         if (selectedMediaType() === 'photo') {
-            setSubmitLoadingState(true, 'Загрузка...');
+            const sourceType = selectedSourceType();
+            const hasUploadPhoto =
+                sourceType === 'upload'
+                && !!fileInput
+                && !!fileInput.files
+                && !!fileInput.files[0];
 
+            const originalFile = hasUploadPhoto ? fileInput.files[0] : null;
+            const shouldOptimize =
+                hasUploadPhoto
+                && !photoAddForm.dataset.photoAutoretry
+                && originalFile.size > MAX_PHOTO_UPLOAD_BYTES;
+
+            if (shouldOptimize && fileInput) {
+                event.preventDefault();
+                setSubmitLoadingState(true, 'Подготовка фото...');
+
+                try {
+                    const optimized = await optimizePhotoForUpload(originalFile, MAX_PHOTO_UPLOAD_BYTES);
+
+                    if (optimized.size > 8 * 1024 * 1024) {
+                        setSubmitLoadingState(false);
+                        window.alert('Фото слишком большое для загрузки. Уменьшите размер файла.');
+                        return;
+                    }
+
+                    const replaced = replaceInputFile(fileInput, optimized);
+                    if (!replaced) {
+                        setSubmitLoadingState(false);
+                        window.alert('Не удалось подготовить фото для загрузки. Попробуйте другой файл.');
+                        return;
+                    }
+
+                    loadPreviewFromImageFile();
+                    photoAddForm.dataset.photoAutoretry = '1';
+                    photoAddForm.requestSubmit();
+                    return;
+                } catch (_error) {
+                    setSubmitLoadingState(false);
+                    window.alert('Не удалось подготовить фото. Попробуйте выбрать другой файл.');
+                    return;
+                }
+            }
+
+            if (photoAddForm.dataset.photoAutoretry) {
+                delete photoAddForm.dataset.photoAutoretry;
+            }
+
+            setSubmitLoadingState(true, 'Загрузка...');
             return;
         }
 

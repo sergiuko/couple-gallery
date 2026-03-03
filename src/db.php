@@ -26,12 +26,34 @@ function db_connect(array $config): PDO
     }
 
     $sqlitePath = $config['sqlite_path'] ?? (__DIR__ . '/../storage/gallery.sqlite');
+
+    if ($sqlitePath === '') {
+        $sqlitePath = __DIR__ . '/../storage/gallery.sqlite';
+    }
+
     $dir = dirname($sqlitePath);
     if (!is_dir($dir)) {
         $created = mkdir($dir, 0755, true);
         if (!$created && !is_dir($dir)) {
             throw new RuntimeException('Не удалось создать директорию для SQLite: ' . $dir);
         }
+    }
+
+    if (!is_writable($dir) && PHP_OS_FAMILY !== 'Windows') {
+        $fallbackDir = '/home/data/couple-gallery';
+
+        if (!is_dir($fallbackDir)) {
+            $created = mkdir($fallbackDir, 0755, true);
+            if (!$created && !is_dir($fallbackDir)) {
+                throw new RuntimeException('Не удалось создать fallback-директорию для SQLite: ' . $fallbackDir);
+            }
+        }
+
+        if (!is_writable($fallbackDir)) {
+            throw new RuntimeException('Fallback-директория SQLite недоступна для записи: ' . $fallbackDir);
+        }
+
+        $sqlitePath = $fallbackDir . '/gallery.sqlite';
     }
 
     $pdo = new PDO('sqlite:' . $sqlitePath, null, null, $options);

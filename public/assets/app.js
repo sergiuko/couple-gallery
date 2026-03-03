@@ -1,5 +1,14 @@
 document.documentElement.classList.add('js');
 
+const shouldReduceEffects =
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    || (typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 4)
+    || (typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 4);
+
+if (shouldReduceEffects) {
+    document.documentElement.classList.add('reduced-effects');
+}
+
 const mobileMenu = document.getElementById('mobileMenu');
 const mobileMenuToggle = document.getElementById('mobileMenuToggle');
 const mobileMenuBackdrop = document.getElementById('mobileMenuBackdrop');
@@ -14,13 +23,19 @@ const photoSourceModeBlocks = document.querySelectorAll('[data-photo-source-mode
 const videoUploadContainer = document.querySelector('[data-media-video-upload]');
 const fileInput = document.getElementById('photo');
 const videoInput = document.getElementById('video');
-const videoPreviewInput = document.getElementById('video_preview');
 const urlInput = document.getElementById('photo_url');
 const previewImage = document.getElementById('cardPreviewImage');
 const focusXInput = document.getElementById('card_focus_x');
 const focusYInput = document.getElementById('card_focus_y');
 const focusXValue = document.getElementById('focusXValue');
 const focusYValue = document.getElementById('focusYValue');
+const videoFramePicker = document.getElementById('videoFramePicker');
+const videoFramePlayer = document.getElementById('videoFramePlayer');
+const videoFrameSeek = document.getElementById('video_frame_seek');
+const captureVideoFrameBtn = document.getElementById('captureVideoFrameBtn');
+const videoPreviewFrameInput = document.getElementById('video_preview_frame');
+const videoFrameTimeValue = document.getElementById('videoFrameTimeValue');
+const videoFrameNote = document.getElementById('videoFrameNote');
 
 const liveSearchForm = document.getElementById('liveSearchForm');
 const searchDataNode = document.getElementById('searchData');
@@ -38,7 +53,7 @@ const initSliderSpeeds = () => {
         return;
     }
 
-    const speedPxPerSecond = 110;
+    const speedPxPerSecond = 95;
 
     sliderTracks.forEach((track) => {
         const travelDistance = track.scrollWidth / 2;
@@ -54,7 +69,14 @@ const initSliderSpeeds = () => {
 
 initSliderSpeeds();
 window.addEventListener('load', initSliderSpeeds);
-window.addEventListener('resize', initSliderSpeeds);
+let sliderResizeTimer = null;
+window.addEventListener('resize', () => {
+    if (sliderResizeTimer) {
+        window.clearTimeout(sliderResizeTimer);
+    }
+
+    sliderResizeTimer = window.setTimeout(initSliderSpeeds, 140);
+});
 
 const setMobileMenuState = (open) => {
     if (!mobileMenu || !mobileMenuToggle || !mobileMenuBackdrop) {
@@ -129,7 +151,7 @@ const handleOutsideProfileClick = (event) => {
 };
 
 document.addEventListener('click', handleOutsideProfileClick);
-document.addEventListener('touchstart', handleOutsideProfileClick);
+document.addEventListener('touchstart', handleOutsideProfileClick, { passive: true });
 
 const initRevealAnimations = () => {
     const revealNodes = document.querySelectorAll(
@@ -176,6 +198,62 @@ initRevealAnimations();
 if (photoAddForm) {
     const mediaTypeInputs = photoAddForm.querySelectorAll('input[name="media_type"]');
     const sourceInputs = photoAddForm.querySelectorAll('input[name="source_type"]');
+    let selectedVideoObjectUrl = null;
+
+    const formatSeconds = (value) => Number(value || 0).toFixed(1);
+
+    const setVideoFrameMessage = (message) => {
+        if (videoFrameNote) {
+            videoFrameNote.textContent = message;
+        }
+    };
+
+    const clearVideoFrameData = () => {
+        if (videoPreviewFrameInput) {
+            videoPreviewFrameInput.value = '';
+        }
+
+        if (videoFrameTimeValue) {
+            videoFrameTimeValue.textContent = '0.0';
+        }
+
+        if (videoFrameSeek) {
+            videoFrameSeek.value = '0';
+            videoFrameSeek.disabled = true;
+        }
+
+        if (videoFramePlayer) {
+            videoFramePlayer.removeAttribute('src');
+            videoFramePlayer.load();
+        }
+
+        if (selectedVideoObjectUrl) {
+            URL.revokeObjectURL(selectedVideoObjectUrl);
+            selectedVideoObjectUrl = null;
+        }
+    };
+
+    const prepareVideoFramePicker = () => {
+        if (!videoInput || !videoFramePicker || !videoFramePlayer) {
+            return;
+        }
+
+        if (!videoInput.files || !videoInput.files[0]) {
+            clearVideoFrameData();
+            videoFramePicker.hidden = true;
+            setVideoFrameMessage('Загрузите видео, выберите момент и нажмите кнопку.');
+            return;
+        }
+
+        const file = videoInput.files[0];
+        clearVideoFrameData();
+        selectedVideoObjectUrl = URL.createObjectURL(file);
+        videoFramePlayer.src = selectedVideoObjectUrl;
+        videoFramePlayer.muted = true;
+        videoFramePlayer.currentTime = 0;
+        videoFramePicker.hidden = false;
+        setVideoFrameMessage('Выберите момент на шкале и нажмите «Взять кадр для превью».');
+    };
 
     const selectedMediaType = () => {
         const selected = photoAddForm.querySelector('input[name="media_type"]:checked');
@@ -207,6 +285,10 @@ if (photoAddForm) {
             videoUploadContainer.hidden = !isVideo;
         }
 
+        if (videoFramePicker) {
+            videoFramePicker.hidden = !isVideo || !videoInput || !videoInput.files || !videoInput.files[0];
+        }
+
         if (fileInput) {
             fileInput.required = !isVideo && selectedSourceType() !== 'url';
         }
@@ -219,8 +301,9 @@ if (photoAddForm) {
             videoInput.required = isVideo;
         }
 
-        if (videoPreviewInput) {
-            videoPreviewInput.required = isVideo;
+        if (!isVideo) {
+            clearVideoFrameData();
+            setVideoFrameMessage('Загрузите видео, выберите момент и нажмите кнопку.');
         }
     };
 
@@ -275,14 +358,6 @@ if (photoAddForm) {
         previewImage.src = URL.createObjectURL(fileInput.files[0]);
     };
 
-    const loadPreviewFromVideoPreview = () => {
-        if (!videoPreviewInput || !previewImage || !videoPreviewInput.files || !videoPreviewInput.files[0]) {
-            return;
-        }
-
-        previewImage.src = URL.createObjectURL(videoPreviewInput.files[0]);
-    };
-
     const loadPreviewFromUrl = () => {
         if (!urlInput || !previewImage) {
             return;
@@ -306,13 +381,101 @@ if (photoAddForm) {
         fileInput.addEventListener('change', loadPreviewFromImageFile);
     }
 
-    if (videoPreviewInput) {
-        videoPreviewInput.addEventListener('change', loadPreviewFromVideoPreview);
+    if (videoInput) {
+        videoInput.addEventListener('change', prepareVideoFramePicker);
     }
 
     if (urlInput) {
         urlInput.addEventListener('input', loadPreviewFromUrl);
     }
+
+    if (videoFramePlayer && videoFrameSeek && videoFrameTimeValue) {
+        videoFramePlayer.addEventListener('loadedmetadata', () => {
+            const duration = Number(videoFramePlayer.duration || 0);
+            if (!Number.isFinite(duration) || duration <= 0) {
+                videoFrameSeek.disabled = true;
+                return;
+            }
+
+            const maxValue = Math.max(1, Math.floor(duration * 10));
+            videoFrameSeek.max = String(maxValue);
+            videoFrameSeek.value = '0';
+            videoFrameSeek.disabled = false;
+            videoFrameTimeValue.textContent = '0.0';
+        });
+
+        videoFrameSeek.addEventListener('input', () => {
+            if (videoFrameSeek.disabled) {
+                return;
+            }
+
+            const seconds = Number(videoFrameSeek.value || 0) / 10;
+            videoFrameTimeValue.textContent = formatSeconds(seconds);
+
+            if (Number.isFinite(seconds)) {
+                try {
+                    videoFramePlayer.currentTime = seconds;
+                } catch (error) {
+                    // ignore seek errors while metadata is still settling
+                }
+            }
+        });
+    }
+
+    if (captureVideoFrameBtn && videoFramePlayer && videoPreviewFrameInput) {
+        captureVideoFrameBtn.addEventListener('click', () => {
+            if (videoFramePlayer.readyState < 2 || !videoFramePlayer.videoWidth || !videoFramePlayer.videoHeight) {
+                setVideoFrameMessage('Видео еще не готово. Подождите секунду и попробуйте снова.');
+                return;
+            }
+
+            const maxPreviewWidth = 640;
+            const scale = Math.min(1, maxPreviewWidth / videoFramePlayer.videoWidth);
+            const targetWidth = Math.max(1, Math.round(videoFramePlayer.videoWidth * scale));
+            const targetHeight = Math.max(1, Math.round(videoFramePlayer.videoHeight * scale));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+
+            const context = canvas.getContext('2d');
+            if (!context) {
+                setVideoFrameMessage('Не удалось создать кадр. Попробуйте другой браузер.');
+                return;
+            }
+
+            context.drawImage(videoFramePlayer, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+
+            if (dataUrl.length > 5 * 1024 * 1024) {
+                setVideoFrameMessage('Кадр получился слишком тяжелым. Выберите другой момент или видео ниже качеством.');
+                return;
+            }
+
+            videoPreviewFrameInput.value = dataUrl;
+
+            if (previewImage) {
+                previewImage.src = dataUrl;
+            }
+
+            setVideoFrameMessage(`Кадр выбран (${formatSeconds(videoFramePlayer.currentTime)}s).`);
+        });
+    }
+
+    photoAddForm.addEventListener('submit', (event) => {
+        if (selectedMediaType() !== 'video') {
+            return;
+        }
+
+        const hasFrame = videoPreviewFrameInput && videoPreviewFrameInput.value.trim() !== '';
+        if (!hasFrame) {
+            event.preventDefault();
+            setVideoFrameMessage('Сначала выберите кадр из видео для превью карточки.');
+            if (videoFramePicker) {
+                videoFramePicker.hidden = false;
+            }
+        }
+    });
 
     updateMediaMode();
     updateSourceMode();
@@ -504,7 +667,7 @@ if (liveSearchForm && searchResultsContainer && searchDataNode) {
             window.clearTimeout(debounceTimer);
         }
 
-        debounceTimer = window.setTimeout(runSearch, 120);
+        debounceTimer = window.setTimeout(runSearch, 180);
     };
 
     liveSearchForm.addEventListener('submit', (event) => {
@@ -514,7 +677,6 @@ if (liveSearchForm && searchResultsContainer && searchDataNode) {
 
     if (qInput) {
         qInput.addEventListener('input', scheduleSearch);
-        qInput.addEventListener('keyup', scheduleSearch);
         qInput.addEventListener('search', scheduleSearch);
         qInput.addEventListener('change', runSearch);
     }
@@ -526,11 +688,6 @@ if (liveSearchForm && searchResultsContainer && searchDataNode) {
 
         field.addEventListener('input', scheduleSearch);
         field.addEventListener('change', runSearch);
-        field.addEventListener('keyup', (event) => {
-            if (event.key === 'Backspace' || event.key === 'Delete') {
-                scheduleSearch();
-            }
-        });
     });
 
     if (clearFiltersBtn) {
@@ -554,12 +711,3 @@ if (liveSearchForm && searchResultsContainer && searchDataNode) {
     runSearch();
 }
 
-document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && mobileMenu && mobileMenu.classList.contains('open')) {
-        setMobileMenuState(false);
-    }
-
-    if (event.key === 'Escape') {
-        setMobileProfileState(false);
-    }
-});

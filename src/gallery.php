@@ -87,3 +87,21 @@ function gallery_add(PDO $pdo, int $userId, string $title, string $description, 
         ':card_focus_y' => $cardFocusY,
     ]);
 }
+
+function gallery_delete(PDO $pdo, int $userId, int $photoId): bool
+{
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $sql = 'DELETE FROM photos WHERE user_id = :user_id AND id = :id';
+
+    if ($driver === 'mysql') {
+        $sql .= ' LIMIT 1';
+    }
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        ':user_id' => $userId,
+        ':id' => $photoId,
+    ]);
+
+    return $stmt->rowCount() > 0;
+}

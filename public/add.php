@@ -202,7 +202,74 @@ function normalize_tags(string $tagsRaw): string
     return implode(',', $result);
 }
 
+function save_video_preview_from_data_url(string $dataUrl, string $uploadDir, array $allowedImageMime): ?string
+{
+    if (!preg_match('#^data:image/[a-zA-Z0-9.+-]+;base64,#', $dataUrl)) {
+        return null;
+    }
+
+    $parts = explode(',', $dataUrl, 2);
+    if (count($parts) !== 2) {
+        return null;
+    }
+
+    $binary = base64_decode($parts[1], true);
+    if (!is_string($binary) || $binary === '') {
+        return null;
+    }
+
+    if (strlen($binary) > 8 * 1024 * 1024) {
+        return null;
+    }
+
+    $tempPath = tempnam(sys_get_temp_dir(), 'cgvp_');
+    if ($tempPath === false) {
+        return null;
+    }
+
+    $written = file_put_contents($tempPath, $binary);
+    if ($written === false) {
+        @unlink($tempPath);
+        return null;
+    }
+
+    $previewMime = detect_image_mime($tempPath);
+    if (!$previewMime || !isset($allowedImageMime[$previewMime])) {
+        @unlink($tempPath);
+        return null;
+    }
+
+    try {
+        $previewFileName = bin2hex(random_bytes(16)) . '.' . $allowedImageMime[$previewMime];
+    } catch (Throwable $exception) {
+        @unlink($tempPath);
+        return null;
+    }
+
+    $previewTargetPath = $uploadDir . '/' . $previewFileName;
+    $previewStored = @rename($tempPath, $previewTargetPath);
+
+    if (!$previewStored) {
+        $previewStored = @copy($tempPath, $previewTargetPath);
+        @unlink($tempPath);
+    }
+
+    if (!$previewStored || !is_file($previewTargetPath)) {
+        return null;
+    }
+
+    return $previewFileName;
+}
+
 if (is_post()) {
+    $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+
+    if ($contentLength > 0 && empty($_POST) && empty($_FILES)) {
+        $postMaxSize = (string) ini_get('post_max_size');
+        flash_set('error', 'Сервер отклонил запрос по лимиту размера (post_max_size=' . $postMaxSize . '). Перезапустите App Service или увеличьте лимит PHP до 128M.');
+        redirect('/add.php');
+    }
+
     $token = $_POST['csrf_token'] ?? null;
 
     if (!csrf_validate($token)) {
@@ -450,50 +517,11 @@ if (is_post()) {
             redirect('/add.php');
         }
 
-        $videoPreview = $_FILES['video_preview'] ?? null;
-        if (!$videoPreview) {
-            flash_set('error', 'Добавьте превью для видео.');
-            redirect('/add.php');
-        }
+        $previewDataUrl = trim((string) ($_POST['video_preview_frame'] ?? ''));
+        $previewFileName = save_video_preview_from_data_url($previewDataUrl, $uploadDir, $allowedImageMime);
 
-        $previewError = (int) ($videoPreview['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($previewError !== UPLOAD_ERR_OK) {
-            flash_set('error', 'Не удалось загрузить превью для видео.');
-            redirect('/add.php');
-        }
-
-        if (($videoPreview['size'] ?? 0) > 8 * 1024 * 1024) {
-            flash_set('error', 'Максимальный размер превью — 8MB.');
-            redirect('/add.php');
-        }
-
-        $previewTmpPath = (string) ($videoPreview['tmp_name'] ?? '');
-        if ($previewTmpPath === '' || !is_file($previewTmpPath)) {
-            flash_set('error', 'Временный файл превью недоступен.');
-            redirect('/add.php');
-        }
-
-        $previewMime = detect_image_mime($previewTmpPath);
-        if (!$previewMime || !isset($allowedImageMime[$previewMime])) {
-            flash_set('error', 'Превью должно быть изображением: JPG, PNG, WEBP, GIF.');
-            redirect('/add.php');
-        }
-
-        try {
-            $previewFileName = bin2hex(random_bytes(16)) . '.' . $allowedImageMime[$previewMime];
-        } catch (Throwable $exception) {
-            flash_set('error', 'Не удалось сгенерировать имя файла превью.');
-            redirect('/add.php');
-        }
-
-        $previewTargetPath = $uploadDir . '/' . $previewFileName;
-        $previewStored = move_uploaded_file($previewTmpPath, $previewTargetPath);
-        if (!$previewStored && is_uploaded_file($previewTmpPath)) {
-            $previewStored = @rename($previewTmpPath, $previewTargetPath) || @copy($previewTmpPath, $previewTargetPath);
-        }
-
-        if (!$previewStored || !is_file($previewTargetPath)) {
-            flash_set('error', 'Не удалось сохранить превью для видео.');
+        if (!$previewFileName) {
+            flash_set('error', 'Выберите кадр из видео для превью карточки.');
             redirect('/add.php');
         }
     }
@@ -514,7 +542,7 @@ $success = flash_get('success');
     <title>Добавить медиа | Love Gallery</title>
     <link rel="stylesheet" href="/assets/style.css?v=<?= urlencode((string) filemtime(__DIR__ . '/assets/style.css')) ?>">
 </head>
-<body>
+<body class="add-page">
 <div class="animated-bg-grid"></div>
 <div class="bg-glow bg-glow-1"></div>
 <div class="bg-glow bg-glow-2"></div>
@@ -583,10 +611,11 @@ $success = flash_get('success');
     <header class="hero animate-fade-up">
         <span class="badge">Upload Media</span>
         <h1>Добавить медиа</h1>
-        <p>Выберите тип контента: фото или видео. Для видео добавьте отдельное превью для карусели просмотров.</p>
+        <p>Выберите тип контента: фото или видео. Для видео выберите кадр прямо из ролика как превью карточки.</p>
     </header>
 
-    <section class="panel animate-fade-up delay-1">
+    <section class="panel add-media-panel animate-fade-up delay-1">
+        <div class="add-media-panel-bg" aria-hidden="true"></div>
         <?php if ($error): ?>
             <div class="alert error"><?= esc($error) ?></div>
         <?php endif; ?>
@@ -595,21 +624,21 @@ $success = flash_get('success');
             <div class="alert success"><?= esc($success) ?></div>
         <?php endif; ?>
 
-        <form class="upload-form" method="post" enctype="multipart/form-data" id="photoAddForm">
+        <form class="upload-form add-media-form" method="post" enctype="multipart/form-data" id="photoAddForm">
             <input type="hidden" name="csrf_token" value="<?= esc(csrf_token()) ?>">
 
-            <label>Тип контента</label>
-            <div class="source-mode">
-                <label><input type="radio" name="media_type" value="photo" checked> Фото</label>
-                <label><input type="radio" name="media_type" value="video"> Видео</label>
+            <label class="add-media-label">Тип контента</label>
+            <div class="source-mode add-media-chips">
+                <label><input type="radio" name="media_type" value="photo" checked> <span>Фото</span></label>
+                <label><input type="radio" name="media_type" value="video"> <span>Видео</span></label>
             </div>
 
-            <div class="source-mode" data-photo-source-mode>
-                <label>Формат добавления</label>
+            <div class="source-mode add-media-mode-head" data-photo-source-mode>
+                <label class="add-media-label">Формат добавления</label>
             </div>
-            <div class="source-mode" data-photo-source-mode>
-                <label><input type="radio" name="source_type" value="upload" checked> Файл</label>
-                <label><input type="radio" name="source_type" value="url"> URL</label>
+            <div class="source-mode add-media-chips" data-photo-source-mode>
+                <label><input type="radio" name="source_type" value="upload" checked> <span>Файл</span></label>
+                <label><input type="radio" name="source_type" value="url"> <span>URL</span></label>
             </div>
 
             <div data-source-upload data-media-photo-upload>
@@ -626,8 +655,16 @@ $success = flash_get('success');
                 <label for="video">Видео (файл)</label>
                 <input id="video" name="video" type="file" accept="video/*">
 
-                <label for="video_preview">Превью видео (изображение)</label>
-                <input id="video_preview" name="video_preview" type="file" accept="image/*">
+                <div class="video-frame-picker" id="videoFramePicker" hidden>
+                    <video id="videoFramePlayer" controls preload="metadata" playsinline></video>
+
+                    <label for="video_frame_seek">Кадр из видео: <span id="videoFrameTimeValue">0.0</span>s</label>
+                    <input id="video_frame_seek" type="range" min="0" max="1" step="1" value="0" disabled>
+
+                    <button type="button" id="captureVideoFrameBtn" class="secondary-button">Взять кадр для превью</button>
+                    <input id="video_preview_frame" name="video_preview_frame" type="hidden">
+                    <p class="video-frame-note" id="videoFrameNote">Загрузите видео, выберите момент и нажмите кнопку.</p>
+                </div>
             </div>
 
             <label for="title">Название момента</label>

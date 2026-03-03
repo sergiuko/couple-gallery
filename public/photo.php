@@ -21,6 +21,59 @@ if (!$photo) {
     redirect('/index.php');
 }
 
+if (is_post()) {
+    $token = $_POST['csrf_token'] ?? null;
+    $action = (string) ($_POST['action'] ?? '');
+
+    if (!csrf_validate($token)) {
+        flash_set('error', 'Неверный токен формы. Попробуйте еще раз.');
+        redirect('/photo.php?id=' . $photoId);
+    }
+
+    if ($action !== 'delete_media') {
+        flash_set('error', 'Неизвестное действие.');
+        redirect('/photo.php?id=' . $photoId);
+    }
+
+    $fileNameToDelete = (string) ($photo['file_name'] ?? '');
+    $previewToDelete = (string) ($photo['preview_file_name'] ?? '');
+
+    try {
+        $deleted = gallery_delete($pdo, (int) $user['id'], $photoId);
+    } catch (Throwable $exception) {
+        flash_set('error', 'Не удалось удалить медиа. Попробуйте снова.');
+        redirect('/photo.php?id=' . $photoId);
+    }
+
+    if (!$deleted) {
+        flash_set('error', 'Не удалось удалить медиа.');
+        redirect('/photo.php?id=' . $photoId);
+    }
+
+    $safeDelete = static function (string $fileName) use ($uploadDir): void {
+        if (
+            $fileName === ''
+            || basename($fileName) !== $fileName
+            || preg_match('/^[A-Za-z0-9._-]+$/', $fileName) !== 1
+        ) {
+            return;
+        }
+
+        $path = $uploadDir . '/' . $fileName;
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    };
+
+    $safeDelete($fileNameToDelete);
+    if ($previewToDelete !== $fileNameToDelete) {
+        $safeDelete($previewToDelete);
+    }
+
+    flash_set('success', 'Медиа удалено.');
+    redirect('/index.php');
+}
+
 $fileName = (string) ($photo['file_name'] ?? '');
 $mediaType = (string) ($photo['media_type'] ?? 'photo');
 $isValidName = $fileName !== ''
@@ -148,6 +201,11 @@ $focusY = max(0, min(100, (int) ($photo['card_focus_y'] ?? 50)));
             <?php if ($photoDate !== ''): ?>
                 <time><?= esc($photoDate) ?></time>
             <?php endif; ?>
+            <form method="post" class="photo-delete-form" onsubmit="return confirm('Удалить это медиа безвозвратно?');">
+                <input type="hidden" name="csrf_token" value="<?= esc(csrf_token()) ?>">
+                <input type="hidden" name="action" value="delete_media">
+                <button type="submit" class="danger-button">Удалить <?= $mediaType === 'video' ? 'видео' : 'фото' ?></button>
+            </form>
         </div>
     </section>
 </main>

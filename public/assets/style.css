@@ -34,8 +34,6 @@ html.reduced-effects {
 }
 
 html.reduced-effects .animated-bg-grid,
-html.reduced-effects .slider-track-left,
-html.reduced-effects .slider-track-right,
 html.reduced-effects .animate-fade-up,
 html.reduced-effects .reveal,
 html.reduced-effects .slider-card::after,
@@ -1094,9 +1092,11 @@ button.is-loading {
     animation-duration: calc(var(--slider-duration, 36s) * 0.78);
 }
 
-.slider-wrap:hover .slider-track,
-.slider-wrap:focus-within .slider-track {
-    animation-play-state: paused;
+@media (hover: hover) and (pointer: fine) {
+    .slider-wrap:hover .slider-track,
+    .slider-wrap:focus-within .slider-track {
+        animation-play-state: paused;
+    }
 }
 
 .slider-card {

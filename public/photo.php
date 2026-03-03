@@ -87,7 +87,18 @@ if (!$isValidName || !media_file_exists($config, $fileName)) {
 
 $imageUrl = media_public_file_url($config, $fileName);
 $videoPosterUrl = null;
+$videoSourceType = null;
 if ($mediaType === 'video') {
+    $extension = strtolower((string) pathinfo($fileName, PATHINFO_EXTENSION));
+    $typeMap = [
+        'mp4' => 'video/mp4',
+        'webm' => 'video/webm',
+        'ogv' => 'video/ogg',
+    ];
+    if (isset($typeMap[$extension])) {
+        $videoSourceType = $typeMap[$extension];
+    }
+
     $previewFileName = (string) ($photo['preview_file_name'] ?? '');
     if (
         $previewFileName !== ''
@@ -185,7 +196,7 @@ $focusY = max(0, min(100, (int) ($photo['card_focus_y'] ?? 50)));
         <div class="photo-view-media">
             <?php if ($mediaType === 'video'): ?>
                 <video controls preload="auto" playsinline data-preload-full="1"<?= $videoPosterUrl ? ' poster="' . esc($videoPosterUrl) . '"' : '' ?>>
-                    <source src="<?= esc($imageUrl) ?>">
+                    <source src="<?= esc($imageUrl) ?>"<?= $videoSourceType ? ' type="' . esc($videoSourceType) . '"' : '' ?>>
                     Ваш браузер не поддерживает воспроизведение видео.
                 </video>
             <?php else: ?>

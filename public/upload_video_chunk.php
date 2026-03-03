@@ -158,11 +158,9 @@ $allowedVideoMime = [
     'video/mp4' => 'mp4',
     'video/webm' => 'webm',
     'video/ogg' => 'ogv',
-    'video/quicktime' => 'mov',
-    'video/x-matroska' => 'mkv',
 ];
 
-$allowedVideoExtensions = ['mp4', 'webm', 'ogv', 'mov', 'mkv'];
+$allowedVideoExtensions = ['mp4', 'webm', 'ogv'];
 
 $videoMime = $detectMime($partPath);
 $originalExtension = strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
@@ -174,7 +172,7 @@ $extensionAllowed = $cleanedExtension !== '' && in_array($cleanedExtension, $all
 if (!$mimeIsAllowed && !$extensionAllowed) {
     @unlink($partPath);
     @unlink($metaPath);
-    $respond(400, ['ok' => false, 'error' => 'Неподдерживаемый формат видео.']);
+    $respond(400, ['ok' => false, 'error' => 'Неподдерживаемый формат видео. Используйте MP4, WEBM или OGV (рекомендуется MP4 H.264/AAC).']);
 }
 
 $safeExtension = 'mp4';

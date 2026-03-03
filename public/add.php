@@ -27,11 +27,9 @@ $allowedVideoMime = [
     'video/mp4' => 'mp4',
     'video/webm' => 'webm',
     'video/ogg' => 'ogv',
-    'video/quicktime' => 'mov',
-    'video/x-matroska' => 'mkv',
 ];
 
-$allowedVideoExtensions = ['mp4', 'webm', 'ogv', 'mov', 'mkv'];
+$allowedVideoExtensions = ['mp4', 'webm', 'ogv'];
 
 function detect_file_mime(string $path): ?string
 {
@@ -554,7 +552,7 @@ if (is_post()) {
             $extensionAllowed = $cleanedExtension !== '' && in_array($cleanedExtension, $allowedVideoExtensions, true);
 
             if (!$mimeIsAllowed && !$browserMimeAllowed && !$extensionAllowed) {
-                flash_set('error', 'Разрешенные форматы видео: MP4, WEBM, OGV, MOV, MKV.');
+                flash_set('error', 'Разрешенные форматы видео: MP4, WEBM, OGV. Для лучшей совместимости используйте MP4 (H.264/AAC).');
                 redirect('/add.php');
             }
 
@@ -727,7 +725,7 @@ $success = flash_get('success');
 
             <div data-media-video-upload hidden>
                 <label for="video">Видео (файл)</label>
-                <input id="video" name="video" type="file" accept="video/*">
+                <input id="video" name="video" type="file" accept="video/mp4,video/webm,video/ogg">
                 <input id="video_staged_file_name" name="video_staged_file_name" type="hidden">
 
                 <div class="video-frame-picker" id="videoFramePicker" hidden>

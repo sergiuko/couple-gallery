@@ -131,41 +131,6 @@ document.addEventListener('keydown', (event) => {
         return;
     }
 
-
-const detailVideo = document.querySelector('.photo-view-media video[data-preload-full="1"]');
-if (detailVideo) {
-    const sourceNode = detailVideo.querySelector('source');
-    const sourceUrl = detailVideo.currentSrc || sourceNode?.src;
-
-    if (sourceUrl) {
-        fetch(sourceUrl, { credentials: 'same-origin' })
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error('Не удалось предварительно загрузить видео.');
-                }
-
-                return response.blob();
-            })
-            .then((blob) => {
-                const objectUrl = URL.createObjectURL(blob);
-                const currentTime = Number(detailVideo.currentTime || 0);
-
-                detailVideo.src = objectUrl;
-                detailVideo.load();
-
-                if (Number.isFinite(currentTime) && currentTime > 0) {
-                    try {
-                        detailVideo.currentTime = currentTime;
-                    } catch (_error) {
-                        // ignore seek restore errors
-                    }
-                }
-            })
-            .catch(() => {
-                // keep native streaming playback if prefetch fails
-            });
-    }
-}
     setMobileProfileState(false);
     setMobileMenuState(false);
 });

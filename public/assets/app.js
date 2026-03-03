@@ -380,7 +380,9 @@ if (photoAddForm) {
             return true;
         } catch (error) {
             videoStagedFileNameInput.value = '';
-            setVideoFrameMessage(error instanceof Error ? error.message : 'Ошибка загрузки видео.');
+            const message = error instanceof Error ? error.message : 'Ошибка загрузки видео.';
+            setVideoFrameMessage(message);
+            window.alert(message);
             return false;
         } finally {
             videoUploadInProgress = false;

@@ -7,7 +7,7 @@ $defaultSkipLocalMediaCheck = false;
 
 if ($isAzureAppService && PHP_OS_FAMILY !== 'Windows') {
     $defaultSqlitePath = '/home/data/couple-gallery/gallery.sqlite';
-    $defaultMediaPublicPrefix = '/uploads';
+    $defaultMediaPublicPrefix = '/public/uploads';
 }
 
 if (str_starts_with(strtolower($defaultMediaPublicPrefix), 'http://') || str_starts_with(strtolower($defaultMediaPublicPrefix), 'https://')) {

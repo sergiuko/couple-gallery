@@ -37,6 +37,7 @@ const videoPreviewFrameInput = document.getElementById('video_preview_frame');
 const videoFrameTimeValue = document.getElementById('videoFrameTimeValue');
 const videoFrameNote = document.getElementById('videoFrameNote');
 const videoStagedFileNameInput = document.getElementById('video_staged_file_name');
+const photoStagedFileNameInput = document.getElementById('photo_staged_file_name');
 
 const liveSearchForm = document.getElementById('liveSearchForm');
 const searchDataNode = document.getElementById('searchData');
@@ -236,9 +237,12 @@ if (photoAddForm) {
     const sourceInputs = photoAddForm.querySelectorAll('input[name="source_type"]');
     let selectedVideoObjectUrl = null;
     let videoUploadInProgress = false;
+    let photoUploadInProgress = false;
 
     const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+    const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
     const VIDEO_CHUNK_BYTES = 192 * 1024;
+    const PHOTO_CHUNK_BYTES = 96 * 1024;
     const isLikelyMobileUpload =
         window.matchMedia('(max-width: 780px)').matches
         || window.matchMedia('(pointer: coarse)').matches;
@@ -430,6 +434,99 @@ if (photoAddForm) {
         }
     };
 
+    const uploadPhotoInChunks = async (file) => {
+        if (!file || !photoStagedFileNameInput || !csrfTokenInput) {
+            return false;
+        }
+
+        if (file.size > MAX_PHOTO_BYTES) {
+            window.alert('Максимальный размер фото — 8MB.');
+            photoStagedFileNameInput.value = '';
+            return false;
+        }
+
+        const uploadId = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+        const totalChunks = Math.max(1, Math.ceil(file.size / PHOTO_CHUNK_BYTES));
+
+        photoUploadInProgress = true;
+        setSubmitLoadingState(true, 'Загрузка фото...');
+
+        try {
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * PHOTO_CHUNK_BYTES;
+                const end = Math.min(start + PHOTO_CHUNK_BYTES, file.size);
+                const chunkBlob = file.slice(start, end);
+
+                const formData = new FormData();
+                formData.append('csrf_token', csrfTokenInput.value);
+                formData.append('upload_id', uploadId);
+                formData.append('chunk_index', String(chunkIndex));
+                formData.append('total_chunks', String(totalChunks));
+                formData.append('original_name', file.name || 'photo.jpg');
+                formData.append('file_size', String(file.size));
+                formData.append('chunk', chunkBlob, `chunk_${chunkIndex}.part`);
+
+                let response = null;
+                let payload = null;
+                let lastError = null;
+
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    try {
+                        response = await fetch('/upload_photo_chunk.php', {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'same-origin',
+                        });
+
+                        try {
+                            payload = await response.json();
+                        } catch (_error) {
+                            payload = null;
+                        }
+
+                        if (response.ok && payload && payload.ok === true) {
+                            break;
+                        }
+
+                        const errorMessage = payload && payload.error
+                            ? String(payload.error)
+                            : 'Не удалось загрузить фото (ошибка чанка).';
+                        lastError = new Error(errorMessage);
+                    } catch (error) {
+                        lastError = error instanceof Error ? error : new Error('Ошибка сети при загрузке чанка фото.');
+                    }
+
+                    if (attempt < 3) {
+                        await new Promise((resolve) => window.setTimeout(resolve, 350 * attempt));
+                    }
+                }
+
+                if (!response || !response.ok || !payload || payload.ok !== true) {
+                    throw lastError || new Error('Не удалось загрузить фото (ошибка чанка).');
+                }
+
+                if (payload.completed === true && payload.file_name) {
+                    photoStagedFileNameInput.value = String(payload.file_name);
+                }
+            }
+
+            if (photoStagedFileNameInput.value.trim() === '') {
+                throw new Error('Сервер не вернул имя загруженного фото.');
+            }
+
+            return true;
+        } catch (error) {
+            photoStagedFileNameInput.value = '';
+            const message = error instanceof Error ? error.message : 'Ошибка загрузки фото.';
+            window.alert(message);
+            return false;
+        } finally {
+            photoUploadInProgress = false;
+            setSubmitLoadingState(false);
+            setSubmitEnabled(true);
+        }
+    };
+
     const selectedMediaType = () => {
         const selected = photoAddForm.querySelector('input[name="media_type"]:checked');
         return selected ? selected.value : 'photo';
@@ -474,11 +571,22 @@ if (photoAddForm) {
 
         if (videoInput) {
             videoInput.required = isVideo;
+            videoInput.disabled = false;
         }
 
         if (!isVideo) {
             clearVideoFrameData();
             setVideoFrameMessage('Загрузите видео, выберите момент и нажмите кнопку.');
+        }
+
+        if (isVideo) {
+            if (photoStagedFileNameInput) {
+                photoStagedFileNameInput.value = '';
+            }
+
+            if (fileInput) {
+                fileInput.disabled = false;
+            }
         }
     };
 
@@ -501,6 +609,11 @@ if (photoAddForm) {
 
         if (fileInput) {
             fileInput.required = !isUrl;
+            fileInput.disabled = false;
+        }
+
+        if (photoStagedFileNameInput && isUrl) {
+            photoStagedFileNameInput.value = '';
         }
 
         if (urlInput) {
@@ -667,7 +780,13 @@ if (photoAddForm) {
     }
 
     if (fileInput) {
-        fileInput.addEventListener('change', loadPreviewFromImageFile);
+        fileInput.addEventListener('change', () => {
+            if (photoStagedFileNameInput) {
+                photoStagedFileNameInput.value = '';
+            }
+
+            loadPreviewFromImageFile();
+        });
     }
 
     if (videoInput) {
@@ -762,32 +881,66 @@ if (photoAddForm) {
     photoAddForm.addEventListener('submit', async (event) => {
         if (selectedMediaType() === 'photo') {
             const sourceType = selectedSourceType();
+
+            if (sourceType !== 'upload') {
+                if (photoStagedFileNameInput) {
+                    photoStagedFileNameInput.value = '';
+                }
+
+                if (fileInput) {
+                    fileInput.disabled = false;
+                }
+
+                setSubmitLoadingState(true, 'Загрузка...');
+                return;
+            }
+
+            if (photoUploadInProgress) {
+                event.preventDefault();
+                window.alert('Дождитесь завершения загрузки фото.');
+                return;
+            }
+
             const hasUploadPhoto =
                 sourceType === 'upload'
                 && !!fileInput
                 && !!fileInput.files
                 && !!fileInput.files[0];
 
-            const originalFile = hasUploadPhoto ? fileInput.files[0] : null;
-            const shouldOptimize =
-                hasUploadPhoto
-                && !photoAddForm.dataset.photoAutoretry
-                && originalFile.size > MAX_PHOTO_UPLOAD_BYTES;
+            const hasStagedPhoto = photoStagedFileNameInput && photoStagedFileNameInput.value.trim() !== '';
+            if (hasStagedPhoto && photoAddForm.dataset.photoAutoretry) {
+                delete photoAddForm.dataset.photoAutoretry;
+            }
 
-            if (shouldOptimize && fileInput) {
+            if (!hasStagedPhoto) {
                 event.preventDefault();
-                setSubmitLoadingState(true, 'Подготовка фото...');
+                if (!hasUploadPhoto) {
+                    window.alert('Выберите изображение для загрузки.');
+                    return;
+                }
 
-                try {
-                    const optimized = await optimizePhotoForUpload(originalFile, MAX_PHOTO_UPLOAD_BYTES);
+                const originalFile = fileInput.files[0];
+                let preparedFile = originalFile;
 
-                    if (optimized.size > 8 * 1024 * 1024) {
+                if (originalFile.size > MAX_PHOTO_UPLOAD_BYTES) {
+                    setSubmitLoadingState(true, 'Подготовка фото...');
+                    try {
+                        preparedFile = await optimizePhotoForUpload(originalFile, MAX_PHOTO_UPLOAD_BYTES);
+                    } catch (_error) {
                         setSubmitLoadingState(false);
-                        window.alert('Фото слишком большое для загрузки. Уменьшите размер файла.');
+                        window.alert('Не удалось подготовить фото. Попробуйте выбрать другой файл.');
                         return;
                     }
+                }
 
-                    const replaced = replaceInputFile(fileInput, optimized);
+                if (preparedFile.size > MAX_PHOTO_BYTES) {
+                    setSubmitLoadingState(false);
+                    window.alert('Максимальный размер фото — 8MB.');
+                    return;
+                }
+
+                if (preparedFile !== originalFile && fileInput) {
+                    const replaced = replaceInputFile(fileInput, preparedFile);
                     if (!replaced) {
                         setSubmitLoadingState(false);
                         window.alert('Не удалось подготовить фото для загрузки. Попробуйте другой файл.');
@@ -795,18 +948,20 @@ if (photoAddForm) {
                     }
 
                     loadPreviewFromImageFile();
+                }
+
+                const uploaded = await uploadPhotoInChunks(preparedFile);
+                if (uploaded && !photoAddForm.dataset.photoAutoretry) {
                     photoAddForm.dataset.photoAutoretry = '1';
                     photoAddForm.requestSubmit();
-                    return;
-                } catch (_error) {
-                    setSubmitLoadingState(false);
-                    window.alert('Не удалось подготовить фото. Попробуйте выбрать другой файл.');
-                    return;
                 }
+
+                return;
             }
 
-            if (photoAddForm.dataset.photoAutoretry) {
-                delete photoAddForm.dataset.photoAutoretry;
+            if (fileInput) {
+                fileInput.required = false;
+                fileInput.disabled = true;
             }
 
             setSubmitLoadingState(true, 'Загрузка...');

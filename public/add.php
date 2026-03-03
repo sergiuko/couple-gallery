@@ -400,70 +400,99 @@ if (is_post()) {
 
         $safeFileName = (string) $saved['file_name'];
     } elseif ($mediaType === 'photo') {
-        $photo = $_FILES['photo'] ?? null;
+        $stagedPhotoFileName = trim((string) ($_POST['photo_staged_file_name'] ?? ''));
 
-        if (!$photo) {
-            flash_set('error', 'Файл не передан в форме.');
-            redirect('/add.php');
-        }
+        if ($stagedPhotoFileName !== '') {
+            if (
+                basename($stagedPhotoFileName) !== $stagedPhotoFileName
+                || preg_match('/^[A-Za-z0-9._-]+$/', $stagedPhotoFileName) !== 1
+                || !is_file($uploadDir . '/' . $stagedPhotoFileName)
+            ) {
+                flash_set('error', 'Подготовленный файл фото не найден. Загрузите фото снова.');
+                redirect('/add.php');
+            }
 
-        $uploadError = (int) ($photo['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($uploadError !== UPLOAD_ERR_OK) {
-            $uploadErrorMap = [
-                UPLOAD_ERR_INI_SIZE => 'Файл слишком большой для настроек сервера (upload_max_filesize).',
-                UPLOAD_ERR_FORM_SIZE => 'Файл превышает ограничение формы.',
-                UPLOAD_ERR_PARTIAL => 'Файл загрузился частично. Попробуйте еще раз.',
-                UPLOAD_ERR_NO_FILE => 'Выберите изображение для загрузки.',
-                UPLOAD_ERR_NO_TMP_DIR => 'На сервере не настроена временная папка для upload.',
-                UPLOAD_ERR_CANT_WRITE => 'Сервер не может записать файл на диск.',
-                UPLOAD_ERR_EXTENSION => 'Загрузка остановлена расширением PHP.',
-            ];
+            $photoPath = $uploadDir . '/' . $stagedPhotoFileName;
+            $stagedPhotoMime = detect_image_mime($photoPath);
 
-            $message = $uploadErrorMap[$uploadError] ?? ('Ошибка загрузки файла. Код: ' . $uploadError);
-            flash_set('error', $message);
-            redirect('/add.php');
-        }
+            if (!$stagedPhotoMime || !isset($allowedImageMime[$stagedPhotoMime]) || @getimagesize($photoPath) === false) {
+                flash_set('error', 'Подготовленный файл фото поврежден. Загрузите фото снова.');
+                redirect('/add.php');
+            }
 
-        if (($photo['size'] ?? 0) > 8 * 1024 * 1024) {
-            flash_set('error', 'Максимальный размер файла — 8MB.');
-            redirect('/add.php');
-        }
+            if (@filesize($photoPath) > 8 * 1024 * 1024) {
+                @unlink($photoPath);
+                flash_set('error', 'Максимальный размер файла — 8MB.');
+                redirect('/add.php');
+            }
 
-        $tmpPath = (string) ($photo['tmp_name'] ?? '');
-        if ($tmpPath === '' || !is_file($tmpPath)) {
-            flash_set('error', 'Временный файл загрузки недоступен. Попробуйте еще раз.');
-            redirect('/add.php');
-        }
+            $safeFileName = $stagedPhotoFileName;
+        } else {
+            $photo = $_FILES['photo'] ?? null;
 
-        $mime = detect_image_mime($tmpPath);
+            if (!$photo) {
+                flash_set('error', 'Файл не передан в форме.');
+                redirect('/add.php');
+            }
 
-        if (!$mime || !isset($allowedImageMime[$mime])) {
-            flash_set('error', 'Разрешенные форматы: JPG, PNG, WEBP, GIF.');
-            redirect('/add.php');
-        }
+            $uploadError = (int) ($photo['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($uploadError !== UPLOAD_ERR_OK) {
+                $uploadErrorMap = [
+                    UPLOAD_ERR_INI_SIZE => 'Файл слишком большой для настроек сервера (upload_max_filesize).',
+                    UPLOAD_ERR_FORM_SIZE => 'Файл превышает ограничение формы.',
+                    UPLOAD_ERR_PARTIAL => 'Файл загрузился частично. Попробуйте еще раз.',
+                    UPLOAD_ERR_NO_FILE => 'Выберите изображение для загрузки.',
+                    UPLOAD_ERR_NO_TMP_DIR => 'На сервере не настроена временная папка для upload.',
+                    UPLOAD_ERR_CANT_WRITE => 'Сервер не может записать файл на диск.',
+                    UPLOAD_ERR_EXTENSION => 'Загрузка остановлена расширением PHP.',
+                ];
 
-        if (@getimagesize($tmpPath) === false) {
-            flash_set('error', 'Файл не является корректным изображением.');
-            redirect('/add.php');
-        }
+                $message = $uploadErrorMap[$uploadError] ?? ('Ошибка загрузки файла. Код: ' . $uploadError);
+                flash_set('error', $message);
+                redirect('/add.php');
+            }
 
-        try {
-            $safeFileName = bin2hex(random_bytes(16)) . '.' . $allowedImageMime[$mime];
-        } catch (Throwable $exception) {
-            flash_set('error', 'Не удалось сгенерировать безопасное имя файла. Попробуйте еще раз.');
-            redirect('/add.php');
-        }
+            if (($photo['size'] ?? 0) > 8 * 1024 * 1024) {
+                flash_set('error', 'Максимальный размер файла — 8MB.');
+                redirect('/add.php');
+            }
 
-        $targetPath = $uploadDir . '/' . $safeFileName;
+            $tmpPath = (string) ($photo['tmp_name'] ?? '');
+            if ($tmpPath === '' || !is_file($tmpPath)) {
+                flash_set('error', 'Временный файл загрузки недоступен. Попробуйте еще раз.');
+                redirect('/add.php');
+            }
 
-        $stored = move_uploaded_file($tmpPath, $targetPath);
-        if (!$stored && is_uploaded_file($tmpPath)) {
-            $stored = @rename($tmpPath, $targetPath) || @copy($tmpPath, $targetPath);
-        }
+            $mime = detect_image_mime($tmpPath);
 
-        if (!$stored || !is_file($targetPath)) {
-            flash_set('error', 'Не удалось сохранить файл.');
-            redirect('/add.php');
+            if (!$mime || !isset($allowedImageMime[$mime])) {
+                flash_set('error', 'Разрешенные форматы: JPG, PNG, WEBP, GIF.');
+                redirect('/add.php');
+            }
+
+            if (@getimagesize($tmpPath) === false) {
+                flash_set('error', 'Файл не является корректным изображением.');
+                redirect('/add.php');
+            }
+
+            try {
+                $safeFileName = bin2hex(random_bytes(16)) . '.' . $allowedImageMime[$mime];
+            } catch (Throwable $exception) {
+                flash_set('error', 'Не удалось сгенерировать безопасное имя файла. Попробуйте еще раз.');
+                redirect('/add.php');
+            }
+
+            $targetPath = $uploadDir . '/' . $safeFileName;
+
+            $stored = move_uploaded_file($tmpPath, $targetPath);
+            if (!$stored && is_uploaded_file($tmpPath)) {
+                $stored = @rename($tmpPath, $targetPath) || @copy($tmpPath, $targetPath);
+            }
+
+            if (!$stored || !is_file($targetPath)) {
+                flash_set('error', 'Не удалось сохранить файл.');
+                redirect('/add.php');
+            }
         }
     } else {
         $stagedVideoFileName = trim((string) ($_POST['video_staged_file_name'] ?? ''));
@@ -688,6 +717,7 @@ $success = flash_get('success');
             <div data-source-upload data-media-photo-upload>
                 <label for="photo">Изображение (файл)</label>
                 <input id="photo" name="photo" type="file" accept="image/*">
+                <input id="photo_staged_file_name" name="photo_staged_file_name" type="hidden">
             </div>
 
             <div data-source-url data-media-photo-url hidden>

@@ -489,7 +489,22 @@ if (photoAddForm) {
             return;
         }
 
-        previewImage.src = URL.createObjectURL(fileInput.files[0]);
+        const file = fileInput.files[0];
+        if (typeof FileReader === 'function') {
+            const reader = new FileReader();
+            reader.onload = () => {
+                if (typeof reader.result === 'string') {
+                    previewImage.src = reader.result;
+                }
+            };
+            reader.onerror = () => {
+                previewImage.src = URL.createObjectURL(file);
+            };
+            reader.readAsDataURL(file);
+            return;
+        }
+
+        previewImage.src = URL.createObjectURL(file);
     };
 
     const replacePhotoInputFile = (newFile) => {

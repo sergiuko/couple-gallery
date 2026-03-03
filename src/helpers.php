@@ -68,7 +68,14 @@ function media_public_url_prefix(array $config): string
         $prefix = '/uploads';
     }
 
-    $prefix = '/' . ltrim($prefix, '/');
+    if (!preg_match('#^https?://#i', $prefix)) {
+        $normalized = '/' . ltrim($prefix, '/');
+        if (str_starts_with($normalized, '/public/uploads')) {
+            $normalized = '/uploads' . substr($normalized, strlen('/public/uploads'));
+        }
+
+        return rtrim($normalized, '/');
+    }
 
     return rtrim($prefix, '/');
 }

@@ -69,7 +69,8 @@ if (!is_writable($uploadDir)) {
     $respond(500, ['ok' => false, 'error' => 'Папка для медиа недоступна для записи.']);
 }
 
-$chunksBaseDir = __DIR__ . '/../storage/chunks/' . (int) $user['id'];
+$tempRoot = rtrim(sys_get_temp_dir(), '/\\');
+$chunksBaseDir = $tempRoot . '/couple_gallery_chunks/' . (int) $user['id'];
 if (!is_dir($chunksBaseDir)) {
     $created = mkdir($chunksBaseDir, 0755, true);
     if (!$created && !is_dir($chunksBaseDir)) {

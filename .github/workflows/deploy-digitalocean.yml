@@ -1,0 +1,45 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create deployment archive
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='vendor' \
+            -czf couple-gallery.tgz .
+
+      - name: Upload archive and deploy script
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_USER: ${{ secrets.DO_USER }}
+          DO_PORT: ${{ secrets.DO_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/do_key
+          chmod 600 ~/.ssh/do_key
+          ssh-keyscan -p "${DO_PORT:-22}" "$DO_HOST" >> ~/.ssh/known_hosts
+
+          scp -P "${DO_PORT:-22}" -i ~/.ssh/do_key couple-gallery.tgz "$DO_USER@$DO_HOST:/tmp/couple-gallery.tgz"
+          scp -P "${DO_PORT:-22}" -i ~/.ssh/do_key scripts/digitalocean/deploy_remote.sh "$DO_USER@$DO_HOST:/tmp/deploy_remote.sh"
+
+      - name: Run remote deploy
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_USER: ${{ secrets.DO_USER }}
+          DO_PORT: ${{ secrets.DO_PORT }}
+        run: |
+          ssh -p "${DO_PORT:-22}" -i ~/.ssh/do_key "$DO_USER@$DO_HOST" "chmod +x /tmp/deploy_remote.sh && /tmp/deploy_remote.sh"

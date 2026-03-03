@@ -1,0 +1,45 @@
+name: Deploy to Oracle Free
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create deployment archive
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='vendor' \
+            -czf couple-gallery.tgz .
+
+      - name: Upload archive and deploy script
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+          ORACLE_PORT: ${{ secrets.ORACLE_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/oracle_key
+          chmod 600 ~/.ssh/oracle_key
+          ssh-keyscan -p "${ORACLE_PORT:-22}" "$ORACLE_HOST" >> ~/.ssh/known_hosts
+
+          scp -P "${ORACLE_PORT:-22}" -i ~/.ssh/oracle_key couple-gallery.tgz "$ORACLE_USER@$ORACLE_HOST:/tmp/couple-gallery.tgz"
+          scp -P "${ORACLE_PORT:-22}" -i ~/.ssh/oracle_key scripts/oracle/deploy_remote.sh "$ORACLE_USER@$ORACLE_HOST:/tmp/deploy_remote.sh"
+
+      - name: Run remote deploy
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+          ORACLE_PORT: ${{ secrets.ORACLE_PORT }}
+        run: |
+          ssh -p "${ORACLE_PORT:-22}" -i ~/.ssh/oracle_key "$ORACLE_USER@$ORACLE_HOST" "chmod +x /tmp/deploy_remote.sh && /tmp/deploy_remote.sh"

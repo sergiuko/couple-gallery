@@ -239,13 +239,13 @@ if (photoAddForm) {
     let videoUploadInProgress = false;
     let photoUploadInProgress = false;
 
-    const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
-    const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
-    const VIDEO_CHUNK_BYTES = isLikelyMobileUpload ? 320 * 1024 : 512 * 1024;
-    const PHOTO_CHUNK_BYTES = isLikelyMobileUpload ? 160 * 1024 : 256 * 1024;
     const isLikelyMobileUpload =
         window.matchMedia('(max-width: 780px)').matches
         || window.matchMedia('(pointer: coarse)').matches;
+    const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+    const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
+    const VIDEO_CHUNK_BYTES = isLikelyMobileUpload ? 96 * 1024 : 320 * 1024;
+    const PHOTO_CHUNK_BYTES = isLikelyMobileUpload ? 64 * 1024 : 160 * 1024;
     const MAX_PHOTO_UPLOAD_BYTES = isLikelyMobileUpload
         ? 2.5 * 1024 * 1024
         : 3.5 * 1024 * 1024;
@@ -328,10 +328,11 @@ if (photoAddForm) {
         const file = videoInput.files[0];
         clearVideoFrameData();
         selectedVideoObjectUrl = URL.createObjectURL(file);
+        videoFramePicker.hidden = false;
         videoFramePlayer.src = selectedVideoObjectUrl;
         videoFramePlayer.muted = true;
         videoFramePlayer.currentTime = 0;
-        videoFramePicker.hidden = false;
+        videoFramePlayer.load();
         setVideoFrameMessage('Выберите момент на шкале и нажмите «Взять кадр для превью».');
     };
 
@@ -405,6 +406,10 @@ if (photoAddForm) {
                 if (!response || !response.ok || !payload || payload.ok !== true) {
                     throw lastError || new Error('Не удалось загрузить видео (ошибка чанка).');
                 }
+
+                const percent = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+                const remaining = Math.max(0, 100 - percent);
+                setSubmitLoadingState(true, `Загрузка видео ${percent}% (осталось ${remaining}%)`);
 
                 if (payload.completed === true && payload.file_name) {
                     videoStagedFileNameInput.value = String(payload.file_name);
@@ -500,6 +505,10 @@ if (photoAddForm) {
                 if (!response || !response.ok || !payload || payload.ok !== true) {
                     throw lastError || new Error('Не удалось загрузить фото (ошибка чанка).');
                 }
+
+                const percent = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+                const remaining = Math.max(0, 100 - percent);
+                setSubmitLoadingState(true, `Загрузка фото ${percent}% (осталось ${remaining}%)`);
 
                 if (payload.completed === true && payload.file_name) {
                     photoStagedFileNameInput.value = String(payload.file_name);
@@ -786,7 +795,7 @@ if (photoAddForm) {
     }
 
     if (videoInput) {
-        videoInput.addEventListener('change', async () => {
+        videoInput.addEventListener('change', () => {
             prepareVideoFramePicker();
 
             if (!videoInput.files || !videoInput.files[0]) {
@@ -797,7 +806,7 @@ if (photoAddForm) {
                 videoStagedFileNameInput.value = '';
             }
 
-            setVideoFrameMessage('Видео выбрано. Нажмите «Загрузить», чтобы отправить его частями.');
+            setVideoFrameMessage('Выберите момент на шкале и нажмите «Взять кадр для превью». Загрузка начнется после кнопки «Загрузить».');
         });
     }
 

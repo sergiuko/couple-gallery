@@ -36,6 +36,7 @@ const captureVideoFrameBtn = document.getElementById('captureVideoFrameBtn');
 const videoPreviewFrameInput = document.getElementById('video_preview_frame');
 const videoFrameTimeValue = document.getElementById('videoFrameTimeValue');
 const videoFrameNote = document.getElementById('videoFrameNote');
+const videoStagedFileNameInput = document.getElementById('video_staged_file_name');
 
 const liveSearchForm = document.getElementById('liveSearchForm');
 const searchDataNode = document.getElementById('searchData');
@@ -199,6 +200,14 @@ if (photoAddForm) {
     const mediaTypeInputs = photoAddForm.querySelectorAll('input[name="media_type"]');
     const sourceInputs = photoAddForm.querySelectorAll('input[name="source_type"]');
     let selectedVideoObjectUrl = null;
+    let photoCompressionPromise = Promise.resolve();
+    let videoUploadInProgress = false;
+
+    const MAX_SAFE_PHOTO_BYTES = 2.8 * 1024 * 1024;
+    const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+    const VIDEO_CHUNK_BYTES = 2 * 1024 * 1024;
+    const submitButton = photoAddForm.querySelector('button[type="submit"]');
+    const csrfTokenInput = photoAddForm.querySelector('input[name="csrf_token"]');
 
     const formatSeconds = (value) => Number(value || 0).toFixed(1);
 
@@ -208,7 +217,17 @@ if (photoAddForm) {
         }
     };
 
+    const setSubmitEnabled = (enabled) => {
+        if (submitButton) {
+            submitButton.disabled = !enabled;
+        }
+    };
+
     const clearVideoFrameData = () => {
+        if (videoStagedFileNameInput) {
+            videoStagedFileNameInput.value = '';
+        }
+
         if (videoPreviewFrameInput) {
             videoPreviewFrameInput.value = '';
         }
@@ -253,6 +272,83 @@ if (photoAddForm) {
         videoFramePlayer.currentTime = 0;
         videoFramePicker.hidden = false;
         setVideoFrameMessage('Выберите момент на шкале и нажмите «Взять кадр для превью».');
+    };
+
+    const uploadVideoInChunks = async (file) => {
+        if (!file || !videoStagedFileNameInput || !csrfTokenInput) {
+            return false;
+        }
+
+        if (file.size > MAX_VIDEO_BYTES) {
+            setVideoFrameMessage('Максимальный размер видео — 100MB.');
+            videoStagedFileNameInput.value = '';
+            return false;
+        }
+
+        const uploadId = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+        const totalChunks = Math.max(1, Math.ceil(file.size / VIDEO_CHUNK_BYTES));
+
+        videoUploadInProgress = true;
+        setSubmitEnabled(false);
+        setVideoFrameMessage('Подготавливаем видео к загрузке...');
+
+        try {
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * VIDEO_CHUNK_BYTES;
+                const end = Math.min(start + VIDEO_CHUNK_BYTES, file.size);
+                const chunkBlob = file.slice(start, end);
+
+                const formData = new FormData();
+                formData.append('csrf_token', csrfTokenInput.value);
+                formData.append('upload_id', uploadId);
+                formData.append('chunk_index', String(chunkIndex));
+                formData.append('total_chunks', String(totalChunks));
+                formData.append('original_name', file.name || 'video.mp4');
+                formData.append('file_size', String(file.size));
+                formData.append('chunk', chunkBlob, `chunk_${chunkIndex}.part`);
+
+                const response = await fetch('/upload_video_chunk.php', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin',
+                });
+
+                let payload = null;
+                try {
+                    payload = await response.json();
+                } catch (_error) {
+                    payload = null;
+                }
+
+                if (!response.ok || !payload || payload.ok !== true) {
+                    const errorMessage = payload && payload.error
+                        ? String(payload.error)
+                        : 'Не удалось загрузить видео (ошибка чанка).';
+                    throw new Error(errorMessage);
+                }
+
+                const percent = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+                setVideoFrameMessage(`Загрузка видео: ${percent}%`);
+
+                if (payload.completed === true && payload.file_name) {
+                    videoStagedFileNameInput.value = String(payload.file_name);
+                }
+            }
+
+            if (videoStagedFileNameInput.value.trim() === '') {
+                throw new Error('Сервер не вернул имя загруженного видео.');
+            }
+
+            setVideoFrameMessage('Видео загружено. Теперь выберите кадр для превью.');
+            return true;
+        } catch (error) {
+            videoStagedFileNameInput.value = '';
+            setVideoFrameMessage(error instanceof Error ? error.message : 'Ошибка загрузки видео.');
+            return false;
+        } finally {
+            videoUploadInProgress = false;
+            setSubmitEnabled(true);
+        }
     };
 
     const selectedMediaType = () => {
@@ -358,6 +454,88 @@ if (photoAddForm) {
         previewImage.src = URL.createObjectURL(fileInput.files[0]);
     };
 
+    const replacePhotoInputFile = (newFile) => {
+        if (!fileInput || !newFile) {
+            return;
+        }
+
+        if (typeof DataTransfer !== 'function') {
+            return;
+        }
+
+        const transfer = new DataTransfer();
+        transfer.items.add(newFile);
+        fileInput.files = transfer.files;
+    };
+
+    const compressPhotoFileIfNeeded = async () => {
+        if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+            return;
+        }
+
+        const originalFile = fileInput.files[0];
+        if (!originalFile.type.startsWith('image/')) {
+            return;
+        }
+
+        if (originalFile.size <= MAX_SAFE_PHOTO_BYTES) {
+            return;
+        }
+
+        const imageUrl = URL.createObjectURL(originalFile);
+
+        try {
+            const image = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Не удалось прочитать изображение.'));
+                img.src = imageUrl;
+            });
+
+            const maxSide = 1920;
+            const ratio = Math.min(1, maxSide / Math.max(image.width, image.height));
+            const width = Math.max(1, Math.round(image.width * ratio));
+            const height = Math.max(1, Math.round(image.height * ratio));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+
+            const context = canvas.getContext('2d');
+            if (!context) {
+                return;
+            }
+
+            context.drawImage(image, 0, 0, width, height);
+
+            const compressedBlob = await new Promise((resolve) => {
+                canvas.toBlob((blob) => resolve(blob || null), 'image/jpeg', 0.78);
+            });
+
+            if (!compressedBlob) {
+                return;
+            }
+
+            if (compressedBlob.size > MAX_SAFE_PHOTO_BYTES) {
+                setVideoFrameMessage('Фото слишком большое для сервера. Выберите файл меньшего размера.');
+                return;
+            }
+
+            const compressedFile = new File(
+                [compressedBlob],
+                originalFile.name.replace(/\.[^.]+$/, '') + '.jpg',
+                { type: 'image/jpeg', lastModified: Date.now() }
+            );
+
+            replacePhotoInputFile(compressedFile);
+            if (previewImage) {
+                previewImage.src = URL.createObjectURL(compressedFile);
+            }
+        } finally {
+            URL.revokeObjectURL(imageUrl);
+        }
+    };
+
     const loadPreviewFromUrl = () => {
         if (!urlInput || !previewImage) {
             return;
@@ -378,11 +556,22 @@ if (photoAddForm) {
     }
 
     if (fileInput) {
-        fileInput.addEventListener('change', loadPreviewFromImageFile);
+        fileInput.addEventListener('change', () => {
+            loadPreviewFromImageFile();
+            photoCompressionPromise = compressPhotoFileIfNeeded();
+        });
     }
 
     if (videoInput) {
-        videoInput.addEventListener('change', prepareVideoFramePicker);
+        videoInput.addEventListener('change', async () => {
+            prepareVideoFramePicker();
+
+            if (!videoInput.files || !videoInput.files[0]) {
+                return;
+            }
+
+            await uploadVideoInChunks(videoInput.files[0]);
+        });
     }
 
     if (urlInput) {
@@ -463,7 +652,25 @@ if (photoAddForm) {
     }
 
     photoAddForm.addEventListener('submit', (event) => {
-        if (selectedMediaType() !== 'video') {
+        if (selectedMediaType() === 'photo') {
+            if (selectedSourceType() === 'upload' && fileInput && fileInput.files && fileInput.files[0] && fileInput.files[0].size > MAX_SAFE_PHOTO_BYTES) {
+                event.preventDefault();
+                window.alert('Фото слишком большое для текущего сервера. Выберите файл до 2.8MB.');
+            }
+
+            return;
+        }
+
+        if (videoUploadInProgress) {
+            event.preventDefault();
+            setVideoFrameMessage('Дождитесь завершения загрузки видео.');
+            return;
+        }
+
+        const hasStagedVideo = videoStagedFileNameInput && videoStagedFileNameInput.value.trim() !== '';
+        if (!hasStagedVideo) {
+            event.preventDefault();
+            setVideoFrameMessage('Сначала выберите видеофайл и дождитесь его загрузки.');
             return;
         }
 
@@ -474,6 +681,12 @@ if (photoAddForm) {
             if (videoFramePicker) {
                 videoFramePicker.hidden = false;
             }
+            return;
+        }
+
+        if (videoInput) {
+            videoInput.required = false;
+            videoInput.disabled = true;
         }
     });
 

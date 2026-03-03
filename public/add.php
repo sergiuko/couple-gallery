@@ -441,80 +441,95 @@ if (is_post()) {
             redirect('/add.php');
         }
     } else {
-        $video = $_FILES['video'] ?? null;
+        $stagedVideoFileName = trim((string) ($_POST['video_staged_file_name'] ?? ''));
 
-        if (!$video) {
-            flash_set('error', 'Файл видео не передан в форме.');
-            redirect('/add.php');
-        }
+        if ($stagedVideoFileName !== '') {
+            if (
+                basename($stagedVideoFileName) !== $stagedVideoFileName
+                || preg_match('/^[A-Za-z0-9._-]+$/', $stagedVideoFileName) !== 1
+                || !is_file($uploadDir . '/' . $stagedVideoFileName)
+            ) {
+                flash_set('error', 'Подготовленный видеофайл не найден. Загрузите видео снова.');
+                redirect('/add.php');
+            }
 
-        $uploadError = (int) ($video['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($uploadError !== UPLOAD_ERR_OK) {
-            $uploadErrorMap = [
-                UPLOAD_ERR_INI_SIZE => 'Видео слишком большое для настроек сервера (upload_max_filesize).',
-                UPLOAD_ERR_FORM_SIZE => 'Видео превышает ограничение формы.',
-                UPLOAD_ERR_PARTIAL => 'Видео загрузилось частично. Попробуйте еще раз.',
-                UPLOAD_ERR_NO_FILE => 'Выберите видео для загрузки.',
-                UPLOAD_ERR_NO_TMP_DIR => 'На сервере не настроена временная папка для upload.',
-                UPLOAD_ERR_CANT_WRITE => 'Сервер не может записать файл на диск.',
-                UPLOAD_ERR_EXTENSION => 'Загрузка остановлена расширением PHP.',
-            ];
+            $safeFileName = $stagedVideoFileName;
+        } else {
+            $video = $_FILES['video'] ?? null;
 
-            $message = $uploadErrorMap[$uploadError] ?? ('Ошибка загрузки видео. Код: ' . $uploadError);
-            flash_set('error', $message);
-            redirect('/add.php');
-        }
+            if (!$video) {
+                flash_set('error', 'Файл видео не передан в форме.');
+                redirect('/add.php');
+            }
 
-        if (($video['size'] ?? 0) > 100 * 1024 * 1024) {
-            flash_set('error', 'Максимальный размер видео — 100MB.');
-            redirect('/add.php');
-        }
+            $uploadError = (int) ($video['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($uploadError !== UPLOAD_ERR_OK) {
+                $uploadErrorMap = [
+                    UPLOAD_ERR_INI_SIZE => 'Видео слишком большое для настроек сервера (upload_max_filesize).',
+                    UPLOAD_ERR_FORM_SIZE => 'Видео превышает ограничение формы.',
+                    UPLOAD_ERR_PARTIAL => 'Видео загрузилось частично. Попробуйте еще раз.',
+                    UPLOAD_ERR_NO_FILE => 'Выберите видео для загрузки.',
+                    UPLOAD_ERR_NO_TMP_DIR => 'На сервере не настроена временная папка для upload.',
+                    UPLOAD_ERR_CANT_WRITE => 'Сервер не может записать файл на диск.',
+                    UPLOAD_ERR_EXTENSION => 'Загрузка остановлена расширением PHP.',
+                ];
 
-        $tmpPath = (string) ($video['tmp_name'] ?? '');
-        if ($tmpPath === '' || !is_file($tmpPath)) {
-            flash_set('error', 'Временный файл видео недоступен. Попробуйте еще раз.');
-            redirect('/add.php');
-        }
+                $message = $uploadErrorMap[$uploadError] ?? ('Ошибка загрузки видео. Код: ' . $uploadError);
+                flash_set('error', $message);
+                redirect('/add.php');
+            }
 
-        $videoMime = detect_file_mime($tmpPath);
-        $browserMime = strtolower(trim((string) ($video['type'] ?? '')));
-        $originalExtension = strtolower((string) pathinfo((string) ($video['name'] ?? ''), PATHINFO_EXTENSION));
-        $cleanedExtension = (string) preg_replace('/[^a-z0-9]+/', '', $originalExtension);
+            if (($video['size'] ?? 0) > 100 * 1024 * 1024) {
+                flash_set('error', 'Максимальный размер видео — 100MB.');
+                redirect('/add.php');
+            }
 
-        $mimeIsAllowed = $videoMime && isset($allowedVideoMime[$videoMime]);
-        $browserMimeAllowed = $browserMime !== '' && isset($allowedVideoMime[$browserMime]);
-        $extensionAllowed = $cleanedExtension !== '' && in_array($cleanedExtension, $allowedVideoExtensions, true);
+            $tmpPath = (string) ($video['tmp_name'] ?? '');
+            if ($tmpPath === '' || !is_file($tmpPath)) {
+                flash_set('error', 'Временный файл видео недоступен. Попробуйте еще раз.');
+                redirect('/add.php');
+            }
 
-        if (!$mimeIsAllowed && !$browserMimeAllowed && !$extensionAllowed) {
-            flash_set('error', 'Разрешенные форматы видео: MP4, WEBM, OGV, MOV, MKV.');
-            redirect('/add.php');
-        }
+            $videoMime = detect_file_mime($tmpPath);
+            $browserMime = strtolower(trim((string) ($video['type'] ?? '')));
+            $originalExtension = strtolower((string) pathinfo((string) ($video['name'] ?? ''), PATHINFO_EXTENSION));
+            $cleanedExtension = (string) preg_replace('/[^a-z0-9]+/', '', $originalExtension);
 
-        $safeExtension = 'mp4';
-        if ($mimeIsAllowed) {
-            $safeExtension = (string) $allowedVideoMime[$videoMime];
-        } elseif ($browserMimeAllowed) {
-            $safeExtension = (string) $allowedVideoMime[$browserMime];
-        } elseif ($extensionAllowed) {
-            $safeExtension = $cleanedExtension;
-        }
+            $mimeIsAllowed = $videoMime && isset($allowedVideoMime[$videoMime]);
+            $browserMimeAllowed = $browserMime !== '' && isset($allowedVideoMime[$browserMime]);
+            $extensionAllowed = $cleanedExtension !== '' && in_array($cleanedExtension, $allowedVideoExtensions, true);
 
-        try {
-            $safeFileName = bin2hex(random_bytes(16)) . '.' . $safeExtension;
-        } catch (Throwable $exception) {
-            flash_set('error', 'Не удалось сгенерировать безопасное имя файла видео. Попробуйте еще раз.');
-            redirect('/add.php');
-        }
+            if (!$mimeIsAllowed && !$browserMimeAllowed && !$extensionAllowed) {
+                flash_set('error', 'Разрешенные форматы видео: MP4, WEBM, OGV, MOV, MKV.');
+                redirect('/add.php');
+            }
 
-        $targetPath = $uploadDir . '/' . $safeFileName;
-        $stored = move_uploaded_file($tmpPath, $targetPath);
-        if (!$stored && is_uploaded_file($tmpPath)) {
-            $stored = @rename($tmpPath, $targetPath) || @copy($tmpPath, $targetPath);
-        }
+            $safeExtension = 'mp4';
+            if ($mimeIsAllowed) {
+                $safeExtension = (string) $allowedVideoMime[$videoMime];
+            } elseif ($browserMimeAllowed) {
+                $safeExtension = (string) $allowedVideoMime[$browserMime];
+            } elseif ($extensionAllowed) {
+                $safeExtension = $cleanedExtension;
+            }
 
-        if (!$stored || !is_file($targetPath)) {
-            flash_set('error', 'Не удалось сохранить видеофайл.');
-            redirect('/add.php');
+            try {
+                $safeFileName = bin2hex(random_bytes(16)) . '.' . $safeExtension;
+            } catch (Throwable $exception) {
+                flash_set('error', 'Не удалось сгенерировать безопасное имя файла видео. Попробуйте еще раз.');
+                redirect('/add.php');
+            }
+
+            $targetPath = $uploadDir . '/' . $safeFileName;
+            $stored = move_uploaded_file($tmpPath, $targetPath);
+            if (!$stored && is_uploaded_file($tmpPath)) {
+                $stored = @rename($tmpPath, $targetPath) || @copy($tmpPath, $targetPath);
+            }
+
+            if (!$stored || !is_file($targetPath)) {
+                flash_set('error', 'Не удалось сохранить видеофайл.');
+                redirect('/add.php');
+            }
         }
 
         $previewDataUrl = trim((string) ($_POST['video_preview_frame'] ?? ''));
@@ -654,6 +669,7 @@ $success = flash_get('success');
             <div data-media-video-upload hidden>
                 <label for="video">Видео (файл)</label>
                 <input id="video" name="video" type="file" accept="video/*">
+                <input id="video_staged_file_name" name="video_staged_file_name" type="hidden">
 
                 <div class="video-frame-picker" id="videoFramePicker" hidden>
                     <video id="videoFramePlayer" controls preload="metadata" playsinline></video>

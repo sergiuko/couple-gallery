@@ -55,17 +55,9 @@ const initSliderSpeeds = () => {
         return;
     }
 
-    const speedPxPerSecond = 95;
-
     sliderTracks.forEach((track) => {
-        const travelDistance = track.scrollWidth / 2;
-
-        if (!travelDistance || !Number.isFinite(travelDistance)) {
-            return;
-        }
-
-        const duration = Math.max(16, travelDistance / speedPxPerSecond);
-        track.style.setProperty('--slider-duration', `${duration.toFixed(2)}s`);
+        const durationSeconds = 110;
+        track.style.setProperty('--slider-duration', `${durationSeconds}s`);
     });
 };
 

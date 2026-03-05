@@ -622,10 +622,18 @@ h1 {
     padding: 9px 10px;
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.24);
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(26, 22, 58, 0.72);
     color: #f7f9ff;
     font: inherit;
     font-size: 13px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.season-theme-picker select option {
+    background: #1b1633;
+    color: #f7f9ff;
 }
 
 .season-theme-picker select:focus {

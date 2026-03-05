@@ -46,6 +46,51 @@ const getHolidayThemeByDate = (date) => {
     return '';
 };
 
+const resolveActiveSeasonTheme = () => {
+    const allowedThemes = ['march8', 'newyear', 'easter'];
+    const storedPreview = (window.localStorage.getItem(HOLIDAY_THEME_STORAGE_KEY) || '').trim().toLowerCase();
+    const isForcedOff = storedPreview === 'off';
+    const previewTheme = allowedThemes.includes(storedPreview) ? storedPreview : '';
+    const autoTheme = getHolidayThemeByDate(new Date());
+    const activeTheme = isForcedOff ? '' : (previewTheme || autoTheme);
+
+    return {
+        storedPreview,
+        previewTheme,
+        activeTheme,
+    };
+};
+
+const renderSeasonThemeBadge = (previewTheme) => {
+    const existingBadge = document.querySelector('.season-preview-badge');
+    if (existingBadge) {
+        existingBadge.remove();
+    }
+
+    if (!previewTheme) {
+        return;
+    }
+
+    const badge = document.createElement('div');
+    badge.className = 'season-preview-badge';
+    badge.textContent = `TEST THEME: ${previewTheme}`;
+    document.body.appendChild(badge);
+};
+
+const applyResolvedSeasonTheme = () => {
+    const { previewTheme, activeTheme } = resolveActiveSeasonTheme();
+
+    if (activeTheme !== '') {
+        document.documentElement.setAttribute('data-season-theme', activeTheme);
+    } else {
+        document.documentElement.removeAttribute('data-season-theme');
+    }
+
+    if (document.body) {
+        renderSeasonThemeBadge(previewTheme);
+    }
+};
+
 const applyHolidayTheme = () => {
     const params = new URLSearchParams(window.location.search);
     const requestedPreview = (params.get('season_preview') || '').trim().toLowerCase();
@@ -59,28 +104,11 @@ const applyHolidayTheme = () => {
         window.localStorage.setItem(HOLIDAY_THEME_STORAGE_KEY, requestedPreview);
     }
 
-    const storedPreview = (window.localStorage.getItem(HOLIDAY_THEME_STORAGE_KEY) || '').trim().toLowerCase();
-    const isForcedOff = storedPreview === 'off';
-    const previewTheme = allowedThemes.includes(storedPreview) ? storedPreview : '';
-    const autoTheme = getHolidayThemeByDate(new Date());
-    const activeTheme = isForcedOff ? '' : (previewTheme || autoTheme);
+    applyResolvedSeasonTheme();
 
-    if (activeTheme !== '') {
-        document.documentElement.setAttribute('data-season-theme', activeTheme);
-    } else {
-        document.documentElement.removeAttribute('data-season-theme');
+    if (!document.body) {
+        document.addEventListener('DOMContentLoaded', applyResolvedSeasonTheme, { once: true });
     }
-
-    if (!previewTheme) {
-        return;
-    }
-
-    const badge = document.createElement('div');
-    badge.className = 'season-preview-badge';
-    badge.textContent = `TEST THEME: ${previewTheme}`;
-    document.addEventListener('DOMContentLoaded', () => {
-        document.body.appendChild(badge);
-    });
 };
 
 applyHolidayTheme();
@@ -91,9 +119,9 @@ const initSeasonThemeSelector = () => {
         return;
     }
 
-    const storedPreview = (window.localStorage.getItem(HOLIDAY_THEME_STORAGE_KEY) || '').trim().toLowerCase();
     const allowedValues = ['auto', 'off', 'march8', 'newyear', 'easter'];
     let initialValue = 'auto';
+    const { storedPreview } = resolveActiveSeasonTheme();
 
     if (storedPreview === 'off' || storedPreview === 'march8' || storedPreview === 'newyear' || storedPreview === 'easter') {
         initialValue = storedPreview;
@@ -121,7 +149,13 @@ const initSeasonThemeSelector = () => {
                 window.localStorage.setItem(HOLIDAY_THEME_STORAGE_KEY, value);
             }
 
-            window.location.reload();
+            selectors.forEach((other) => {
+                if (other instanceof HTMLSelectElement) {
+                    other.value = value;
+                }
+            });
+
+            applyResolvedSeasonTheme();
         });
     });
 };

@@ -642,6 +642,18 @@ $success = flash_get('success');
                 <strong><?= esc($user['full_name']) ?></strong>
                 <span><?= esc($user['email']) ?></span>
             </div>
+            <?php if (strtolower((string) ($user['email'] ?? '')) === 'termenskysergiy@gmail.com'): ?>
+                <div class="season-theme-picker">
+                    <label>Тема сайта</label>
+                    <select data-season-theme-select>
+                        <option value="auto">Авто (по дате)</option>
+                        <option value="off">Без темы</option>
+                        <option value="march8">8 Березня</option>
+                        <option value="newyear">Новий рік</option>
+                        <option value="easter">Великдень</option>
+                    </select>
+                </div>
+            <?php endif; ?>
             <a class="logout-link" href="/logout.php">Выйти</a>
         </div>
     </div>
@@ -674,6 +686,18 @@ $success = flash_get('success');
                     <strong><?= esc($user['full_name']) ?></strong>
                     <span><?= esc($user['email']) ?></span>
                 </div>
+                <?php if (strtolower((string) ($user['email'] ?? '')) === 'termenskysergiy@gmail.com'): ?>
+                    <div class="season-theme-picker">
+                        <label>Тема сайта</label>
+                        <select data-season-theme-select>
+                            <option value="auto">Авто (по дате)</option>
+                            <option value="off">Без темы</option>
+                            <option value="march8">8 Березня</option>
+                            <option value="newyear">Новий рік</option>
+                            <option value="easter">Великдень</option>
+                        </select>
+                    </div>
+                <?php endif; ?>
                 <a class="logout-link" href="/logout.php">Выйти</a>
             </div>
         </details>
@@ -769,6 +793,13 @@ $success = flash_get('success');
         </form>
     </section>
 </main>
+
+<footer class="love-footer animate-fade-up delay-3" aria-label="Love is footer">
+    <div class="love-is-line" aria-hidden="true">
+        <span class="love-is-beam"></span>
+        <span class="love-is-text"><span class="love-is-heart">❤</span><span>Love is...</span></span>
+    </div>
+</footer>
 
 <script src="/assets/app.js?v=<?= urlencode((string) filemtime(__DIR__ . '/assets/app.js')) ?>"></script>
 </body>

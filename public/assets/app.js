@@ -51,16 +51,19 @@ const applyHolidayTheme = () => {
     const requestedPreview = (params.get('season_preview') || '').trim().toLowerCase();
     const allowedThemes = ['march8', 'newyear', 'easter'];
 
-    if (requestedPreview === 'auto' || requestedPreview === 'off') {
+    if (requestedPreview === 'auto') {
         window.localStorage.removeItem(HOLIDAY_THEME_STORAGE_KEY);
+    } else if (requestedPreview === 'off') {
+        window.localStorage.setItem(HOLIDAY_THEME_STORAGE_KEY, 'off');
     } else if (allowedThemes.includes(requestedPreview)) {
         window.localStorage.setItem(HOLIDAY_THEME_STORAGE_KEY, requestedPreview);
     }
 
     const storedPreview = (window.localStorage.getItem(HOLIDAY_THEME_STORAGE_KEY) || '').trim().toLowerCase();
+    const isForcedOff = storedPreview === 'off';
     const previewTheme = allowedThemes.includes(storedPreview) ? storedPreview : '';
     const autoTheme = getHolidayThemeByDate(new Date());
-    const activeTheme = previewTheme || autoTheme;
+    const activeTheme = isForcedOff ? '' : (previewTheme || autoTheme);
 
     if (activeTheme !== '') {
         document.documentElement.setAttribute('data-season-theme', activeTheme);
@@ -81,6 +84,49 @@ const applyHolidayTheme = () => {
 };
 
 applyHolidayTheme();
+
+const initSeasonThemeSelector = () => {
+    const selectors = document.querySelectorAll('[data-season-theme-select]');
+    if (!selectors.length) {
+        return;
+    }
+
+    const storedPreview = (window.localStorage.getItem(HOLIDAY_THEME_STORAGE_KEY) || '').trim().toLowerCase();
+    const allowedValues = ['auto', 'off', 'march8', 'newyear', 'easter'];
+    let initialValue = 'auto';
+
+    if (storedPreview === 'off' || storedPreview === 'march8' || storedPreview === 'newyear' || storedPreview === 'easter') {
+        initialValue = storedPreview;
+    }
+
+    selectors.forEach((selector) => {
+        if (selector instanceof HTMLSelectElement && allowedValues.includes(initialValue)) {
+            selector.value = initialValue;
+        }
+
+        selector.addEventListener('change', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const value = String(target.value || 'auto').toLowerCase();
+            if (!allowedValues.includes(value)) {
+                return;
+            }
+
+            if (value === 'auto') {
+                window.localStorage.removeItem(HOLIDAY_THEME_STORAGE_KEY);
+            } else {
+                window.localStorage.setItem(HOLIDAY_THEME_STORAGE_KEY, value);
+            }
+
+            window.location.reload();
+        });
+    });
+};
+
+document.addEventListener('DOMContentLoaded', initSeasonThemeSelector);
 
 const shouldReduceEffects =
     window.matchMedia('(prefers-reduced-motion: reduce)').matches

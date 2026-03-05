@@ -604,6 +604,36 @@ h1 {
     line-height: 1.2;
 }
 
+.season-theme-picker {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.season-theme-picker label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #dfe5ff;
+}
+
+.season-theme-picker select {
+    width: 100%;
+    margin: 0;
+    padding: 9px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.08);
+    color: #f7f9ff;
+    font: inherit;
+    font-size: 13px;
+}
+
+.season-theme-picker select:focus {
+    outline: none;
+    border-color: rgba(255, 94, 168, 0.62);
+    box-shadow: 0 0 0 2px rgba(255, 94, 168, 0.16);
+}
+
 .profile-dropdown .logout-link {
     width: 100%;
     margin-top: 12px;

@@ -139,6 +139,18 @@ function photo_display_date(array $photo): string
                 <strong><?= esc($user['full_name']) ?></strong>
                 <span><?= esc($user['email']) ?></span>
             </div>
+            <?php if (strtolower((string) ($user['email'] ?? '')) === 'termenskysergiy@gmail.com'): ?>
+                <div class="season-theme-picker">
+                    <label>Тема сайта</label>
+                    <select data-season-theme-select>
+                        <option value="auto">Авто (по дате)</option>
+                        <option value="off">Без темы</option>
+                        <option value="march8">8 Березня</option>
+                        <option value="newyear">Новий рік</option>
+                        <option value="easter">Великдень</option>
+                    </select>
+                </div>
+            <?php endif; ?>
             <a class="logout-link" href="/logout.php">Выйти</a>
         </div>
     </div>
@@ -171,6 +183,18 @@ function photo_display_date(array $photo): string
                     <strong><?= esc($user['full_name']) ?></strong>
                     <span><?= esc($user['email']) ?></span>
                 </div>
+                <?php if (strtolower((string) ($user['email'] ?? '')) === 'termenskysergiy@gmail.com'): ?>
+                    <div class="season-theme-picker">
+                        <label>Тема сайта</label>
+                        <select data-season-theme-select>
+                            <option value="auto">Авто (по дате)</option>
+                            <option value="off">Без темы</option>
+                            <option value="march8">8 Березня</option>
+                            <option value="newyear">Новий рік</option>
+                            <option value="easter">Великдень</option>
+                        </select>
+                    </div>
+                <?php endif; ?>
                 <a class="logout-link" href="/logout.php">Выйти</a>
             </div>
         </details>

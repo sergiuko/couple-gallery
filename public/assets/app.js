@@ -2,11 +2,42 @@ document.documentElement.classList.add('js');
 
 const HOLIDAY_THEME_STORAGE_KEY = 'seasonThemePreview';
 
-const formatDateKey = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+const formatDateKey = ({ year, month, day }) => {
+    const safeYear = String(year);
+    const safeMonth = String(month).padStart(2, '0');
+    const safeDay = String(day).padStart(2, '0');
+    return `${safeYear}-${safeMonth}-${safeDay}`;
+};
+
+const getHelsinkiDateParts = () => {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Helsinki',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    });
+
+    const parts = formatter.formatToParts(new Date());
+    const values = {
+        year: 0,
+        month: 0,
+        day: 0,
+    };
+
+    parts.forEach((part) => {
+        if (part.type === 'year' || part.type === 'month' || part.type === 'day') {
+            values[part.type] = Number(part.value || 0);
+        }
+    });
+
+    return values;
+};
+
+const dateToParts = (date) => {
+    const year = Number(date.getFullYear());
+    const month = Number(date.getMonth() + 1);
+    const day = Number(date.getDate());
+    return { year, month, day };
 };
 
 const getOrthodoxEasterDate = (year) => {
@@ -26,9 +57,9 @@ const getOrthodoxEasterDate = (year) => {
     return new Date(julianDate.getUTCFullYear(), julianDate.getUTCMonth(), julianDate.getUTCDate());
 };
 
-const getHolidayThemeByDate = (date) => {
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
+const getHolidayThemeByDate = (dateParts) => {
+    const month = dateParts.month;
+    const day = dateParts.day;
 
     if (month === 3 && day === 8) {
         return 'march8';
@@ -38,8 +69,8 @@ const getHolidayThemeByDate = (date) => {
         return 'newyear';
     }
 
-    const easterDate = getOrthodoxEasterDate(date.getFullYear());
-    if (formatDateKey(date) === formatDateKey(easterDate)) {
+    const easterDate = getOrthodoxEasterDate(dateParts.year);
+    if (formatDateKey(dateParts) === formatDateKey(dateToParts(easterDate))) {
         return 'easter';
     }
 
@@ -51,7 +82,7 @@ const resolveActiveSeasonTheme = () => {
     const storedPreview = (window.localStorage.getItem(HOLIDAY_THEME_STORAGE_KEY) || '').trim().toLowerCase();
     const isForcedOff = storedPreview === 'off';
     const previewTheme = allowedThemes.includes(storedPreview) ? storedPreview : '';
-    const autoTheme = getHolidayThemeByDate(new Date());
+    const autoTheme = getHolidayThemeByDate(getHelsinkiDateParts());
     const activeTheme = isForcedOff ? '' : (previewTheme || autoTheme);
 
     return {

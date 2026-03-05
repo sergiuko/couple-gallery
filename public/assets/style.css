@@ -79,6 +79,65 @@ html[data-season-theme='easter'] body::before {
     background: rgba(78, 92, 34, 0.48);
 }
 
+html[data-season-theme='march8'] body::after,
+html[data-season-theme='newyear'] body::after,
+html[data-season-theme='easter'] body::after {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 8px;
+    z-index: -1;
+    font-size: clamp(16px, 2.2vw, 26px);
+    line-height: 1;
+    opacity: 0.45;
+    pointer-events: none;
+    white-space: pre;
+    text-align: center;
+    text-shadow: 0 0 14px rgba(255, 255, 255, 0.25);
+}
+
+html[data-season-theme='march8'] body::after {
+    content: '🌷   💗   🌸   ✨   💐   💞   🌷';
+    animation: seasonPetalsFloat 11s ease-in-out infinite;
+}
+
+html[data-season-theme='newyear'] body::after {
+    content: '❄️   ✨   🎄   ✨   ❄️   🎁   ✨';
+    animation: seasonSnowDrift 13s linear infinite;
+}
+
+html[data-season-theme='easter'] body::after {
+    content: '🥚   🌼   🐣   🌷   🥚   🐰   🌼';
+    animation: seasonEasterBounce 12s ease-in-out infinite;
+}
+
+html[data-season-theme='march8'] .bg-glow,
+html[data-season-theme='newyear'] .bg-glow,
+html[data-season-theme='easter'] .bg-glow {
+    animation: float 12s ease-in-out infinite, seasonGlowPulse 8.4s ease-in-out infinite;
+}
+
+html[data-season-theme='march8'] .cute-float {
+    opacity: 0.42;
+    animation-duration: 13.5s;
+}
+
+html[data-season-theme='newyear'] .cute-float {
+    opacity: 0.34;
+    animation-duration: 18s;
+}
+
+html[data-season-theme='easter'] .cute-float {
+    opacity: 0.38;
+    animation-duration: 15s;
+}
+
+html[data-season-theme='march8'] .badge,
+html[data-season-theme='newyear'] .badge,
+html[data-season-theme='easter'] .badge {
+    animation: badgeGlow 2.8s ease-in-out infinite, seasonBadgePulse 6.5s ease-in-out infinite;
+}
+
 .season-preview-badge {
     position: fixed;
     right: 10px;
@@ -118,6 +177,7 @@ html.reduced-effects {
 html.reduced-effects .animated-bg-grid,
 html.reduced-effects .animate-fade-up,
 html.reduced-effects .reveal,
+html.reduced-effects body::after,
 html.reduced-effects .slider-card::after,
 html.reduced-effects .love-is-beam,
 html.reduced-effects .love-is-text,
@@ -145,6 +205,61 @@ html.reduced-effects .cute-bg {
 
 html.reduced-effects .cute-float {
     animation-duration: 20s !important;
+}
+
+@keyframes seasonPetalsFloat {
+    0%, 100% {
+        transform: translate3d(-12px, 0, 0) scale(0.98);
+        opacity: 0.34;
+    }
+    50% {
+        transform: translate3d(12px, -6px, 0) scale(1.03);
+        opacity: 0.5;
+    }
+}
+
+@keyframes seasonSnowDrift {
+    0% {
+        transform: translate3d(-18px, 0, 0);
+        opacity: 0.34;
+    }
+    50% {
+        transform: translate3d(18px, -3px, 0);
+        opacity: 0.5;
+    }
+    100% {
+        transform: translate3d(-18px, 0, 0);
+        opacity: 0.34;
+    }
+}
+
+@keyframes seasonEasterBounce {
+    0%, 100% {
+        transform: translateY(0);
+        opacity: 0.34;
+    }
+    50% {
+        transform: translateY(-7px);
+        opacity: 0.5;
+    }
+}
+
+@keyframes seasonGlowPulse {
+    0%, 100% {
+        opacity: 0.56;
+    }
+    50% {
+        opacity: 0.72;
+    }
+}
+
+@keyframes seasonBadgePulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.035);
+    }
 }
 
 html.reduced-effects .mobile-menu,

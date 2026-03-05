@@ -62,19 +62,19 @@ html[data-season-theme='easter'] body::before {
 }
 
 html[data-season-theme='march8'] body::before {
-    content: '8 Березня 🌷';
+    content: '8 Марта 🌷';
     color: #ffd9ed;
     background: rgba(120, 30, 90, 0.45);
 }
 
 html[data-season-theme='newyear'] body::before {
-    content: 'З Новим роком 🎄';
+    content: 'С Новым годом 🎄';
     color: #ddf6ff;
     background: rgba(12, 70, 88, 0.48);
 }
 
 html[data-season-theme='easter'] body::before {
-    content: 'Світлого Великодня 🐣';
+    content: 'Светлой Пасхи 🐣';
     color: #f8ffd9;
     background: rgba(78, 92, 34, 0.48);
 }

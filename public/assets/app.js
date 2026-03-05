@@ -149,6 +149,12 @@ const initSeasonThemeSelector = () => {
                 window.localStorage.setItem(HOLIDAY_THEME_STORAGE_KEY, value);
             }
 
+            if (value === 'off' || value === 'auto') {
+                document.documentElement.removeAttribute('data-season-theme');
+            } else {
+                document.documentElement.setAttribute('data-season-theme', value);
+            }
+
             selectors.forEach((other) => {
                 if (other instanceof HTMLSelectElement) {
                     other.value = value;
@@ -160,7 +166,13 @@ const initSeasonThemeSelector = () => {
     });
 };
 
-document.addEventListener('DOMContentLoaded', initSeasonThemeSelector);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSeasonThemeSelector);
+} else {
+    initSeasonThemeSelector();
+}
+
+initSeasonThemeSelector();
 
 const shouldReduceEffects =
     window.matchMedia('(prefers-reduced-motion: reduce)').matches

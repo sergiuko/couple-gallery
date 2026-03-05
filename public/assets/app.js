@@ -1,5 +1,87 @@
 document.documentElement.classList.add('js');
 
+const HOLIDAY_THEME_STORAGE_KEY = 'seasonThemePreview';
+
+const formatDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getOrthodoxEasterDate = (year) => {
+    const a = year % 4;
+    const b = year % 7;
+    const c = year % 19;
+    const d = (19 * c + 15) % 30;
+    const e = (2 * a + 4 * b - d + 34) % 7;
+
+    const month = Math.floor((d + e + 114) / 31);
+    const day = ((d + e + 114) % 31) + 1;
+
+    const julianDate = new Date(Date.UTC(year, month - 1, day));
+    const gregorianShift = Math.floor(year / 100) - Math.floor(year / 400) - 2;
+    julianDate.setUTCDate(julianDate.getUTCDate() + gregorianShift);
+
+    return new Date(julianDate.getUTCFullYear(), julianDate.getUTCMonth(), julianDate.getUTCDate());
+};
+
+const getHolidayThemeByDate = (date) => {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+
+    if (month === 3 && day === 8) {
+        return 'march8';
+    }
+
+    if ((month === 12 && day === 31) || (month === 1 && day === 1)) {
+        return 'newyear';
+    }
+
+    const easterDate = getOrthodoxEasterDate(date.getFullYear());
+    if (formatDateKey(date) === formatDateKey(easterDate)) {
+        return 'easter';
+    }
+
+    return '';
+};
+
+const applyHolidayTheme = () => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedPreview = (params.get('season_preview') || '').trim().toLowerCase();
+    const allowedThemes = ['march8', 'newyear', 'easter'];
+
+    if (requestedPreview === 'auto' || requestedPreview === 'off') {
+        window.localStorage.removeItem(HOLIDAY_THEME_STORAGE_KEY);
+    } else if (allowedThemes.includes(requestedPreview)) {
+        window.localStorage.setItem(HOLIDAY_THEME_STORAGE_KEY, requestedPreview);
+    }
+
+    const storedPreview = (window.localStorage.getItem(HOLIDAY_THEME_STORAGE_KEY) || '').trim().toLowerCase();
+    const previewTheme = allowedThemes.includes(storedPreview) ? storedPreview : '';
+    const autoTheme = getHolidayThemeByDate(new Date());
+    const activeTheme = previewTheme || autoTheme;
+
+    if (activeTheme !== '') {
+        document.documentElement.setAttribute('data-season-theme', activeTheme);
+    } else {
+        document.documentElement.removeAttribute('data-season-theme');
+    }
+
+    if (!previewTheme) {
+        return;
+    }
+
+    const badge = document.createElement('div');
+    badge.className = 'season-preview-badge';
+    badge.textContent = `TEST THEME: ${previewTheme}`;
+    document.addEventListener('DOMContentLoaded', () => {
+        document.body.appendChild(badge);
+    });
+};
+
+applyHolidayTheme();
+
 const shouldReduceEffects =
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
     || (typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 4)
